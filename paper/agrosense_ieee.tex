@@ -47,30 +47,30 @@ employing over 37\% of the national workforce, continues to incur significant
 crop losses attributable to water stress, disease outbreaks, and sub-optimal
 input application. Conventional field scouting is labour-intensive, infrequent,
 and dependent on expert availability. This paper presents AgroSense, an
-integrated agricultural intelligence platform that processes Sentinel-2 and
-Landsat-8 satellite imagery via Google Earth Engine (GEE), runs five machine
-learning models trained on real Pakistan field data, and delivers real-time
-weather intelligence from Open-Meteo. The system provides crop stress
-classification, irrigation recommendations, yield forecasting, soil health
-assessment, and variable-rate application (VRA) zone mapping through a
-cross-platform Flutter mobile application, a bilingual (English/Urdu) desktop
-application, and a RESTful API deployed on Google Cloud Run. For the crop stress
-classification task, a comparative evaluation of five ML algorithms---Random
-Forest, XGBoost, Gradient Boosting, SVM (RBF), and $k$-NN---is conducted on
-1,786 real Sentinel-2 observations from 116 field sites across all four
-provinces (Punjab, Sindh, Balochistan, and KPK) over ten growing seasons
-(2015--2024), collected directly via the Google Earth Engine API. Evaluation
-uses a field-grouped train/test split (\texttt{GroupShuffleSplit} on site
-identifiers) and 5-fold \texttt{StratifiedGroupKFold} cross-validation with
-\texttt{GridSearchCV} hyperparameter tuning to prevent data leakage from
-repeated seasonal observations of the same field. SVM (RBF) achieves the
-highest test accuracy (98.34\%) and XGBoost achieves the highest
-cross-validated macro F1-score (0.983). The Random Forest classifier (96.40\%
-test accuracy, CV macro F1~=~0.980) is selected as the production model on the
-basis of interpretability and feature importance transparency. Results confirm
-that nine Sentinel-2 spectral features provide sufficient discriminative signal
-for reliable spectral proxy crop-condition classification across Pakistan's
-diverse agronomic zones.
+integrated agricultural intelligence platform that processes Sentinel-2
+satellite imagery via Google Earth Engine (GEE), runs five machine learning
+models, and delivers real-time weather intelligence from Open-Meteo. The system
+provides crop-condition monitoring, irrigation recommendations, yield
+forecasting, soil health assessment, and variable-rate application (VRA) zone
+mapping through a cross-platform Flutter mobile application, a bilingual
+(English/Urdu) desktop application, and a RESTful API deployed on Google Cloud
+Run. For the crop-condition proxy classification task, a comparative evaluation
+of five ML algorithms---Random Forest, XGBoost, Gradient Boosting, SVM~(RBF),
+and $k$-NN---is conducted on 1,786 Sentinel-2 observations from 99
+georeferenced agricultural sampling locations (district/city-centroid buffers)
+across all four provinces (Punjab, Sindh, Balochistan, and KPK), spanning 19
+crop-season windows from 2015 to 2024, collected via the GEE API. Class labels
+(Healthy / Stressed / Diseased) are spectrally derived proxy classes generated
+from a vegetation health composite; the input features NDVI, NDRE, and EVI also
+participate in label generation. Evaluation uses a location-grouped train/test
+split (\texttt{GroupShuffleSplit} on sampling-location identifiers) and nested
+5-fold \texttt{StratifiedGroupKFold} cross-validation with \texttt{GridSearchCV}
+hyperparameter tuning. SVM~(RBF) achieves the highest held-out test accuracy
+(98.34\%) and XGBoost achieves the best nested cross-validated macro F1 (0.983).
+Random Forest (96.40\% test accuracy, nested CV macro F1~=~0.980) is selected
+as the production model for interpretability. Reported results represent an
+upper bound on spectral proxy separability rather than independently validated
+crop disease detection.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -131,12 +131,14 @@ The principal contributions of this paper are:
   \item A bilingual (English/Urdu) cross-platform interface design enabling
         farmer and agronomist accessibility across Pakistan's linguistic
         landscape.
-  \item A crop stress dataset comprising 1,786 real Sentinel-2 Level-2A
-        observations collected via Google Earth Engine from 116 field sites
-        across all four provinces of Pakistan over ten growing seasons
-        (2015--2024), supplemented by a 4,730-sample historical archive
-        spanning Landsat~7, Landsat~8, and Sentinel-2 (2000--2024), made
-        available as a reproducible evaluation benchmark.
+  \item A crop-condition proxy dataset comprising 1,786 Sentinel-2 Level-2A
+        observations collected via Google Earth Engine from 99 georeferenced
+        agricultural sampling locations (district/city-centroid buffers) across
+        all four provinces of Pakistan, spanning 19 crop-season windows from
+        2015 to 2024, released as a reproducible evaluation benchmark at
+        \url{https://github.com/ALI-SHAHMEER/agrosense-pakistan-crop-stress}.
+        Labels are spectrally derived proxy classes; independent agronomic
+        ground-truth validation is future work.
 \end{enumerate}
 
 % ─────────────────────────────────────────────────────────────────────────────
@@ -424,23 +426,29 @@ severity levels.
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Machine Learning Models}
 
-All models are trained on 1,786 real Sentinel-2 Level-2A observations collected
-directly via the Google Earth Engine API from 116 field sites across all four
-provinces (Punjab, Sindh, Balochistan, and KPK) over ten growing seasons
-(2015--2024). A broader historical archive of 4,730 samples spanning Landsat~7
-(2000--2012), Landsat~8 (2013--2014), and Sentinel-2 (2015--2024) is maintained
-for temporal trend analysis. Five crops are represented: wheat (49\%), rice
-(17\%), cotton (15\%), sugarcane (12\%), and mango (6\%). Yield outputs are
-calibrated against Pakistan Bureau of Statistics 2024 provincial
-averages~\cite{pbs2024}.
+The crop-condition classifier is trained on 1,786 Sentinel-2 Level-2A
+observations collected via the GEE API from 99 georeferenced agricultural
+sampling locations (district/city-centroid buffers, ~1~km radius) across all
+four provinces (Punjab, Sindh, Balochistan, and KPK), spanning 19 crop-season
+windows from 2015 to 2024 (10 Kharif, 9 Rabi). Five crops are represented:
+wheat (883, 49.4\%), rice (308, 17.2\%), cotton (272, 15.2\%), sugarcane
+(216, 12.1\%), and mango (107, 6.0\%), derived programmatically from the
+published CSV. The remaining four decision-support modules (irrigation,
+yield, soil health, VRA zones) are prototype components calibrated against
+Pakistan Bureau of Statistics 2024 provincial averages~\cite{pbs2024}
+and pending task-specific validation datasets.
 
 \subsection{Crop Stress Classification}
 
 A Random Forest classifier~\cite{breiman2001} is trained on nine
-Sentinel-2-derived features: NDVI, EVI, NDWI, NDRE, LAI, NDVI\_std,
-NDVI\_min, and NDVI\_max. The three output classes are \textit{Healthy}, \textit{Stressed}, and
-\textit{Diseased}. The model targets early disease
-detection and prioritisation of targeted field scouting activities.
+Sentinel-2-derived spectral features: NDVI, EVI, NDWI, NDRE, LAI, BSI,
+NDVI\_std, NDVI\_min, and NDVI\_max. The three output proxy classes are
+\textit{Healthy}, \textit{Stressed}, and \textit{Diseased}. These labels
+are derived from a vegetation health composite (0.5$\cdot$NDVI +
+0.3$\cdot$NDRE + 0.2$\cdot$EVI) via tertile split; the same NDVI, NDRE, and
+EVI are also input features, creating a known label-circularity relationship.
+Reported performance measures spectral proxy separability and is an upper bound
+relative to independently validated disease detection.
 
 \subsection{Irrigation Recommendation}
 
@@ -539,22 +547,27 @@ $s_{\text{moisture}}$ when satellite indices are available.
 
 \subsection{Experimental Setup}
 
-Five classifiers are evaluated on the crop stress classification task. The
-dataset comprises 1,786 observations (596 Healthy, 595 Stressed, 595 Diseased)
-described by nine Sentinel-2-derived spectral features (six derived indices and
-three temporal NDVI statistics) collected via the Google Earth Engine API from
-116 field sites across all four provinces of Pakistan over ten growing seasons
-(2015--2024). To prevent data leakage arising from repeated seasonal
-observations at the same field sites, the train/test split is performed at the
-field level using \texttt{GroupShuffleSplit} on site identifiers
-(seed~42), yielding 1,425 training observations across 79 sites and 361 test
-observations across 20 held-out sites. All algorithms are tuned via
-\texttt{GridSearchCV} with 5-fold \texttt{StratifiedGroupKFold}
-cross-validation optimising macro F1-score. Reported metrics are
-macro-averaged precision, recall, and F1 on the held-out test set, plus mean
-5-fold grouped cross-validated F1. Model training and evaluation are
-implemented in scikit-learn~\cite{sklearn} and
-XGBoost~\cite{chen2016xgboost}.
+Five classifiers are evaluated on the crop-condition proxy classification task.
+The dataset comprises 1,786 observations (596 Healthy, 595 Stressed, 595 Diseased)
+described by nine Sentinel-2-derived spectral features (six derived indices:
+NDVI, EVI, NDWI, NDRE, LAI, BSI; and three temporal NDVI statistics:
+NDVI\_std, NDVI\_min, NDVI\_max), collected from 99 georeferenced agricultural
+sampling locations across all four provinces of Pakistan spanning 19 crop-season
+windows (2015--2024). Feature scaling via \texttt{StandardScaler} is applied
+inside a \texttt{Pipeline} for SVM and $k$-NN; tree-based models receive raw
+features.
+
+To prevent data leakage from repeated seasonal observations at the same
+sampling location, the train/test split is performed at the sampling-location
+level using \texttt{GroupShuffleSplit} (seed~42), yielding 1,425 training
+observations across 79 locations and 361 test observations across 20 held-out
+locations. Hyperparameters are selected via \texttt{GridSearchCV} with a 3-fold
+inner \texttt{StratifiedGroupKFold}. Generalisation is estimated using a nested
+5-fold outer \texttt{StratifiedGroupKFold} with inner 3-fold grouped grid search
+per fold. Reported metrics are macro-averaged precision, recall, and F1 on the
+held-out test set, plus nested cross-validated macro F1 (mean and standard
+deviation across 5 outer folds). Model training is implemented in
+scikit-learn~\cite{sklearn} and XGBoost~\cite{chen2016xgboost}.
 
 \subsection{Overall Classification Results}
 
@@ -562,32 +575,37 @@ Table~\ref{tab:overall} reports test-set and cross-validation results for all
 five classifiers.
 
 \begin{table}[htbp]
-  \caption{Overall Classifier Comparison on Sentinel-2 Crop Stress Dataset}
+  \caption{Classifier Comparison — Sentinel-2 Crop-Condition Proxy Dataset
+           (held-out: 361 obs / 20 locations; nested CV: 5-fold outer, 3-fold inner)}
   \label{tab:overall}
   \centering
   \renewcommand{\arraystretch}{1.2}
-  \begin{tabular}{lccccc}
+  \begin{tabular}{lcccccc}
     \toprule
-    \textbf{Algorithm} & \textbf{Acc (\%)} & \textbf{Prec} & \textbf{Rec} & \textbf{F1} & \textbf{CV F1} \\
+    \textbf{Algorithm} & \textbf{Acc} & \textbf{Prec} & \textbf{Rec} & \textbf{F1} & \textbf{Nested CV F1} & \textbf{±~Std} \\
     \midrule
-    SVM (RBF)               & \textbf{98.34} & \textbf{0.980} & \textbf{0.984} & \textbf{0.982} & 0.978 \\
-    XGBoost                 & 97.78 & 0.974 & 0.980 & 0.977 & \textbf{0.983} \\
-    Gradient Boosting       & 96.95 & 0.967 & 0.973 & 0.970 & 0.980 \\
-    \textbf{Random Forest}  & 96.40 & 0.961 & 0.969 & 0.965 & 0.980 \\
-    $k$-NN                  & 95.84 & 0.951 & 0.961 & 0.955 & 0.963 \\
+    SVM (RBF)               & \textbf{0.983} & \textbf{0.980} & \textbf{0.984} & \textbf{0.982} & 0.969 & 0.017 \\
+    XGBoost                 & 0.975 & 0.971 & 0.978 & 0.974 & \textbf{0.983} & \textbf{0.006} \\
+    Gradient Boosting       & 0.972 & 0.971 & 0.974 & 0.972 & 0.981 & 0.005 \\
+    \textbf{Random Forest}  & 0.964 & 0.961 & 0.969 & 0.965 & 0.980 & 0.007 \\
+    $k$-NN                  & 0.961 & 0.954 & 0.961 & 0.957 & 0.956 & 0.008 \\
     \bottomrule
-    \multicolumn{6}{l}{\small All metrics macro-averaged. CV = 5-fold StratifiedGroupKFold (field-grouped).}
+    \multicolumn{7}{l}{\small All metrics 0--1 scale, macro-averaged. Pipeline with StandardScaler for SVM and $k$-NN.}
   \end{tabular}
 \end{table}
 
-SVM (RBF) achieves the highest test accuracy (98.34\%) under field-grouped
-evaluation, while XGBoost achieves the highest cross-validated macro F1 (0.983).
-Gradient Boosting is closely competitive (96.95\% accuracy, CV F1~=~0.980).
-Random Forest (96.40\%, CV F1~=~0.980) is selected as the production deployment
-model on the basis of superior interpretability and established robustness on
-agricultural remote sensing datasets~\cite{breiman2001,karthikeyan2020}.
-$k$-NN trails at 95.84\% test accuracy, reflecting sensitivity to the
-high-dimensional spectral feature space without learned metric adaptation.
+SVM (RBF) achieves the highest held-out test accuracy (0.983) and test macro
+F1 (0.982), benefiting from the \texttt{StandardScaler} Pipeline and the
+non-linear RBF kernel under the scaled feature space. XGBoost achieves the
+highest nested cross-validated macro F1 (0.983~$\pm$~0.006), indicating
+stronger consistency across location groups. SVM's nested CV F1 (0.969) has
+notably higher variance (std~=~0.017), suggesting sensitivity to specific
+location-group compositions in this dataset. Random Forest (test
+accuracy~=~0.964, nested CV F1~=~0.980~$\pm$~0.007) is selected as the
+production model for its interpretability and native feature
+importance~\cite{breiman2001,karthikeyan2020}. $k$-NN trails at 0.961 test
+accuracy (nested CV~=~0.956), reflecting sensitivity to feature-space geometry
+despite the StandardScaler Pipeline.
 Fig.~\ref{fig:accuracy_f1} visualises the accuracy and macro F1 comparison
 across all five classifiers.
 
@@ -614,23 +632,23 @@ not seen during training).
     \toprule
     \textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
     \midrule
-    Diseased & 0.980 & 0.950 & 0.970 & 181 \\
-    Healthy  & 1.000 & 0.990 & 0.990 &  86 \\
-    Stressed & 0.900 & 0.970 & 0.930 &  94 \\
+    Diseased (\textit{proxy}) & 0.983 & 0.950 & 0.966 & 181 \\
+    Healthy  (\textit{proxy}) & 1.000 & 0.988 & 0.994 &  86 \\
+    Stressed (\textit{proxy}) & 0.901 & 0.968 & 0.933 &  94 \\
     \midrule
-    Macro    & 0.960 & 0.970 & 0.960 & 361 \\
+    Macro                     & 0.961 & 0.969 & 0.965 & 361 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The Healthy class achieves perfect precision (1.000) with near-perfect recall
-(0.990) across 86 test samples. The Diseased class attains precision of 0.980
-with recall of 0.950 across 181 test samples, representing the largest class in
-the grouped test partition. The Stressed class achieves the lowest precision
-(0.900) while maintaining high recall (0.970), indicating that the model
-conservatively assigns stress labels -- an operationally acceptable failure mode
-since false positive stress detections impose lower costs than missed disease
-cases that may propagate to unmitigated crop loss.
+The Healthy proxy class achieves perfect precision (1.000) with 0.988 recall
+across 86 test observations. The Diseased proxy class attains 0.983 precision
+with 0.950 recall across 181 test observations, which represent the largest
+partition in the location-grouped test set. The Stressed proxy class achieves
+the lowest precision (0.901) while maintaining 0.968 recall. Because the proxy
+labels are derived from the same spectral composite as the input features, per-class
+performance should be interpreted as \textit{spectral proxy separability}
+within this fitted model rather than verified crop pathology detection accuracy.
 Normalised confusion matrices for all five classifiers are shown in
 Fig.~\ref{fig:confusion}.
 
@@ -648,7 +666,10 @@ Table~\ref{tab:featimp} ranks the nine spectral features by importance for the
 three tree-based models. Fig.~\ref{fig:featimp} provides a grouped bar chart.
 
 \begin{table}[htbp]
-  \caption{Feature Importance Rankings (Top 5 by Random Forest)}
+  \caption{Native Feature Importance — Tree Models (impurity-based, sorted by RF).
+           Caution: NDVI, NDRE, and EVI also appear in the label-generation rule,
+           which inflates their apparent importance. Values are not directly
+           comparable across algorithm families.}
   \label{tab:featimp}
   \centering
   \renewcommand{\arraystretch}{1.2}
@@ -656,11 +677,15 @@ three tree-based models. Fig.~\ref{fig:featimp} provides a grouped bar chart.
     \toprule
     \textbf{Rank} & \textbf{Feature} & \textbf{RF} & \textbf{XGBoost} & \textbf{GB} \\
     \midrule
-    1 & EVI       & 0.188 & 0.025 & 0.019 \\
-    2 & NDVI      & 0.173 & 0.445 & 0.032 \\
-    3 & NDVI\_min  & 0.164 & 0.034 & 0.088 \\
-    4 & NDVI\_std  & 0.161 & 0.237 & 0.546 \\
-    5 & NDRE      & 0.122 & 0.110 & 0.101 \\
+    1 & NDVI      & 0.307 & 0.183 & 0.306 \\
+    2 & LAI       & 0.249 & 0.646 & 0.371 \\
+    3 & NDRE      & 0.236 & 0.134 & 0.302 \\
+    4 & EVI       & 0.112 & 0.014 & 0.019 \\
+    5 & NDVI\_max  & 0.042 & 0.002 & 0.000 \\
+    6 & NDWI      & 0.040 & 0.005 & 0.001 \\
+    7 & BSI       & 0.006 & 0.008 & 0.000 \\
+    8 & NDVI\_min  & 0.005 & 0.005 & 0.001 \\
+    9 & NDVI\_std  & 0.004 & 0.005 & 0.000 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -673,13 +698,25 @@ three tree-based models. Fig.~\ref{fig:featimp} provides a grouped bar chart.
   \label{fig:featimp}
 \end{figure}
 
-EVI and NDVI are consistently the top two contributors across all three models.
-NDVI\_std (temporal variability) is the dominant feature for Gradient Boosting
-(0.546), indicating that temporal NDVI instability is a strong discriminator for
-disease versus stress. NDWI is the least informative feature, likely because
-irrigation stress and disease share similar canopy water content signatures at
-Sentinel-2 spatial resolution. The per-class F1 heatmap across all models is
-shown in Fig.~\ref{fig:heatmap}.
+NDVI, LAI, and NDRE are the three most informative features across all tree
+models. For Random Forest, NDVI (0.307), LAI (0.249), and NDRE (0.236) together
+account for 79\% of importance; EVI contributes 0.112 and the remaining five
+features are near-zero. For XGBoost, LAI dominates strongly (0.646), with NDVI
+(0.183) and NDRE (0.134) distant second and third. Gradient Boosting shows a
+similar three-feature concentration: LAI (0.371), NDVI (0.306), NDRE (0.302).
+NDWI, BSI, and all three temporal NDVI statistics (ndvi\_min, ndvi\_max,
+ndvi\_std) are collectively below 0.05 in RF importance, suggesting limited
+marginal discriminative power once the core spectral indices are included.
+
+\textbf{Caution on circularity:} NDVI, NDRE, and EVI are the three indices that
+define the crop\_stress\_label via a weighted composite.
+Their high importance partly reflects the deterministic labelling rule rather than
+independent biological variation; the reported ranking therefore measures
+\emph{spectral proxy separability}, not confirmed agronomic importance.
+LAI is a linear rescaling of EVI (LAI = 3.618$\cdot$EVI $-$ 0.118), so its
+apparent dominance in boosted models is likely an artefact of that
+transformation. The per-class F1 heatmap across all models is shown in
+Fig.~\ref{fig:heatmap}.
 
 \begin{figure}[htbp]
   \centering
@@ -690,32 +727,44 @@ shown in Fig.~\ref{fig:heatmap}.
 
 \subsection{Discussion}
 
-The results demonstrate that nine Sentinel-2 spectral features -- six derived
-indices and three temporal NDVI statistics -- provide sufficient discriminative
+The results demonstrate that nine Sentinel-2 spectral features — six derived
+indices and three temporal NDVI statistics — provide sufficient discriminative
 signal for spectral proxy crop-condition classification across Pakistan's diverse
 agronomic zones. Macro F1-score was selected as the primary optimisation
 criterion to treat all three classes equally across their near-balanced support
-(596 Healthy, 595 Stressed, 595 Diseased). The field-grouped cross-validated
-macro F1 of 0.983 (XGBoost) compares favourably against comparable Sentinel-2
-classification benchmarks in the literature: Htitiou \textit{et
-al.}~\cite{htitiou2020} reported 88\% overall accuracy for Random-Forest-based
-crop type mapping, while Maleki \textit{et al.}~\cite{maleki2024} achieved F1
-scores of 89.9--93.5\% for summer crop mapping using multi-sensor fusion.
-AgroSense achieves competitive performance using Sentinel-2 spectral indices
-alone, without SAR data, which is practically significant for deployment
-contexts where SAR pre-processing expertise is limited.
+(596 Healthy, 595 Stressed, 595 Diseased). The location-grouped nested
+cross-validated macro F1 reached 0.9831 $\pm$ 0.0063 (XGBoost), 0.9813 $\pm$
+0.005 (Gradient Boosting), and 0.9804 $\pm$ 0.0066 (Random Forest) on the
+outer CV folds, with the held-out location-grouped test set yielding
+0.9740 (XGBoost) and 0.9819 (SVM RBF).
 
-A key methodological contribution of this evaluation is the use of
-\textit{field-grouped} train/test splitting: the dataset contains multiple
-seasonal observations per field site, and a naive random split would allow the
-same site to appear in both training and test partitions, inflating accuracy
-estimates. By applying \texttt{GroupShuffleSplit} on site identifiers, the
-20-site test partition contains only locations unseen during training, providing
-a more conservative and realistic estimate of generalisation to new fields.
+\textit{Comparison with prior work requires a critical caveat}: Htitiou
+\textit{et al.}~\cite{htitiou2020} reported 88\% overall accuracy using Random
+Forest for crop-type mapping with ground-truth field surveys, and Maleki
+\textit{et al.}~\cite{maleki2024} achieved F1 scores of 89.9--93.5\% for crop
+mapping using multi-sensor fusion and in-situ reference data. These works used
+independently verified class labels. By contrast, AgroSense labels are
+\textit{spectrally derived} from the same NDVI, NDRE, and EVI values used as
+features; the comparison is therefore not directly commensurate. Our high
+F1 values partially reflect spectral proxy separability rather than independent
+agronomic validation. Future work with GPS-surveyed, pathology-confirmed field
+samples is needed for a fair cross-study comparison.
+
+A key methodological contribution is the use of \textit{location-grouped}
+train/test splitting: the dataset contains multiple seasonal observations per
+sampling location, and a naive random split would allow the same location to
+appear in both training and test partitions, inflating accuracy estimates.
+By applying \texttt{GroupShuffleSplit} on location identifiers, the held-out
+test set contains only sampling locations unseen during training, providing a
+more conservative and realistic estimate of generalisation to new locations.
+Similarly, nested cross-validation (5-fold outer / 3-fold inner
+\texttt{StratifiedGroupKFold}) was used to avoid overfitting hyperparameter
+selection to the validation split.
+
 Reported metrics should be interpreted as spectral proxy classification
-performance, as class labels are derived from the same vegetation indices used
-as features; ground-truth field validation remains an important direction for
-future work to establish independently verified disease detection accuracy.
+performance. Class labels are derived from the same vegetation indices used as
+features; ground-truth field validation remains an important direction for future
+work to establish independently verified crop-condition detection accuracy.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \section{API Design}
@@ -789,12 +838,17 @@ smallholder farming sector. Three findings emerge from this work. First, nine
 Sentinel-2 spectral features (six derived indices and three temporal NDVI
 statistics) provide sufficient discriminative signal for spectral proxy
 crop-condition classification across all four provinces of Pakistan, with
-SVM~(RBF) achieving the highest test accuracy (98.34\%) and XGBoost achieving
-the best cross-validated macro F1 (0.983) under field-grouped evaluation.
-Second, field-level train/test separation (\texttt{GroupShuffleSplit} on site
-identifiers) is essential for honest accuracy estimation when datasets contain
-multiple seasonal observations per location; naive random splits inflate
-reported accuracy by allowing the same site to appear in both partitions.
+SVM~(RBF) achieving the highest location-grouped held-out test accuracy
+(98.34\%) and XGBoost achieving the best nested cross-validated macro F1
+(0.983~$\pm$~0.006) — both under location-grouped evaluation. Reported
+performance measures spectral proxy separability; class labels are derived
+from the same spectral indices used as features, and independent field
+validation is future work.
+Second, location-grouped train/test separation (\texttt{GroupShuffleSplit} on
+location identifiers) is essential for honest accuracy estimation when datasets
+contain multiple seasonal observations per sampling location; naive random
+splits inflate reported accuracy by allowing the same location to appear in
+both partitions.
 Third, a single stateless REST API deployed on Google Cloud
 Run~\cite{gorelick2017,fastapi} can serve both a Flutter mobile
 application~\cite{flutter} and a PyQt6 desktop application, enabling

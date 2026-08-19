@@ -1,0 +1,3 @@
+# Optional: only needed for src/collect_gee_data.py
+# Install with: pip install -r requirements-gee.txt
+earthengine-api>=0.1.370

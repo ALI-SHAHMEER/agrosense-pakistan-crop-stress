@@ -1,0 +1,16 @@
+Algorithm,Class,Precision,Recall,F1,Support
+Random Forest,Diseased,0.9829,0.9503,0.9663,181
+Random Forest,Healthy,1.0,0.9884,0.9942,86
+Random Forest,Stressed,0.901,0.9681,0.9333,94
+XGBoost,Diseased,0.9943,0.9669,0.9804,181
+XGBoost,Healthy,0.9884,0.9884,0.9884,86
+XGBoost,Stressed,0.9293,0.9787,0.9534,94
+Gradient Boosting,Diseased,0.9831,0.9669,0.9749,181
+Gradient Boosting,Healthy,1.0,0.9884,0.9942,86
+Gradient Boosting,Stressed,0.9286,0.9681,0.9479,94
+SVM (RBF),Diseased,0.9944,0.9834,0.9889,181
+SVM (RBF),Healthy,0.9884,0.9884,0.9884,86
+SVM (RBF),Stressed,0.9583,0.9787,0.9684,94
+k-NN,Diseased,0.9943,0.9613,0.9775,181
+k-NN,Healthy,0.9762,0.9535,0.9647,86
+k-NN,Stressed,0.8922,0.9681,0.9286,94

@@ -4,25 +4,33 @@ title: "AgroSense: Satellite-Based Crop Stress Classification and Smart Farming 
 authors:
   - family-names: Shahmeer
     given-names: Ali
+  - family-names: Hassan
+    given-names: Basit
+    name-suffix: MS
+  - family-names: Ghoto
+    given-names: Kabir
+    name-suffix: PhD
 version: "1.0.0"
 date-released: "2026-08-19"
 url: "https://github.com/ALI-SHAHMEER/agrosense-pakistan-crop-stress"
 abstract: >
-  AgroSense is a crop stress classification system that uses Sentinel-2
-  satellite imagery collected via the Google Earth Engine API to classify
-  Pakistani agricultural fields into spectrally derived crop-condition proxy
-  classes (Healthy, Stressed, Diseased). This repository contains 1,786 real
-  Sentinel-2 observations from 116 field sites across all four provinces of
-  Pakistan over ten growing seasons (2015-2024). Labels are derived from a
-  vegetation health composite and have not been independently validated against
-  field diagnoses. The best model (SVM RBF) achieves 98.34% test accuracy
-  under field-grouped evaluation (GroupShuffleSplit on location_id).
+  Replication package for AgroSense: a spectral proxy crop-condition
+  classification system using Sentinel-2 imagery collected via the Google
+  Earth Engine API. The dataset contains 1,786 observations from 99
+  georeferenced agricultural sampling locations (district/city-centroid
+  buffers) across all four provinces of Pakistan, spanning 19 seasons
+  (Kharif 2015-2024, Rabi 2016-2024). Class labels (Healthy / Stressed /
+  Diseased) are derived from a vegetation health composite using NDVI, NDRE,
+  and EVI via tertile split; these same indices are model input features
+  (label circularity). Reported performance measures spectral proxy
+  separability, not independently validated crop disease detection.
 keywords:
   - remote sensing
   - precision agriculture
-  - crop stress
+  - crop condition proxy classification
   - Sentinel-2
   - machine learning
   - Pakistan
   - Google Earth Engine
+  - spectral indices
 license: MIT

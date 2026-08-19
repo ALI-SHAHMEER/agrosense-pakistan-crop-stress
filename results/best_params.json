@@ -1,0 +1,40 @@
+{
+  "Random Forest": {
+    "best_params": {
+      "max_depth": null,
+      "min_samples_split": 2,
+      "n_estimators": 200
+    },
+    "inner_cv_f1": 0.9812
+  },
+  "XGBoost": {
+    "best_params": {
+      "learning_rate": 0.05,
+      "max_depth": 6,
+      "n_estimators": 200
+    },
+    "inner_cv_f1": 0.9818
+  },
+  "Gradient Boosting": {
+    "best_params": {
+      "learning_rate": 0.05,
+      "max_depth": 3,
+      "n_estimators": 100
+    },
+    "inner_cv_f1": 0.9791
+  },
+  "SVM (RBF)": {
+    "best_params": {
+      "model__C": 100,
+      "model__gamma": "scale"
+    },
+    "inner_cv_f1": 0.968
+  },
+  "k-NN": {
+    "best_params": {
+      "model__metric": "manhattan",
+      "model__n_neighbors": 5
+    },
+    "inner_cv_f1": 0.9614
+  }
+}

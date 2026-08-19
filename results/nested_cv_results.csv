@@ -1,0 +1,26 @@
+Algorithm,Fold,F1_Macro
+Random Forest,1,0.9914
+Random Forest,2,0.9828
+Random Forest,3,0.9785
+Random Forest,4,0.9717
+Random Forest,5,0.9776
+XGBoost,1,0.9855
+XGBoost,2,0.9858
+XGBoost,3,0.9892
+XGBoost,4,0.9838
+XGBoost,5,0.9709
+Gradient Boosting,1,0.9881
+Gradient Boosting,2,0.9853
+Gradient Boosting,3,0.9811
+Gradient Boosting,4,0.9772
+Gradient Boosting,5,0.9746
+SVM (RBF),1,0.9441
+SVM (RBF),2,0.9788
+SVM (RBF),3,0.9781
+SVM (RBF),4,0.9553
+SVM (RBF),5,0.9891
+k-NN,1,0.949
+k-NN,2,0.9644
+k-NN,3,0.9644
+k-NN,4,0.9466
+k-NN,5,0.956

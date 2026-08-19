@@ -1,131 +1,167 @@
-# Dataset Description — AgroSense Pakistan Crop Stress
+# Dataset Description — AgroSense Pakistan Crop-Condition Proxy Classification
 
 ## Overview
 
-`agrosense_crop_stress_dataset.csv` contains **1,786 real Sentinel-2 Level-2A
-observations** collected via the Google Earth Engine (GEE) API from **116 field
-sites across all four provinces of Pakistan** (Punjab, Sindh, Balochistan, KPK)
-over **ten growing seasons (2015–2024)**.
+`data/agrosense_crop_stress_dataset.csv` contains **1,786 Sentinel-2
+Level-2A observations** collected via the Google Earth Engine (GEE) API from
+**99 georeferenced agricultural sampling locations** — district and city
+centroids with ~1 km buffers — across all four provinces of Pakistan
+(Punjab, Sindh, Balochistan, KPK), spanning **19 crop-season windows**
+(Kharif 2015–2024 and Rabi 2016–2024).
 
-## Important: Label Circularity
+### Important: sampling location definition
+
+Coordinates are **publicly available district/city centroids**, not
+individually surveyed or GPS-verified farm field boundaries.
+Results represent location-grouped performance across administrative-unit
+centroids, not individual farm-field generalisation.
+
+---
+
+## ⚠ Label Circularity
 
 The `crop_stress_label` column is derived **from the same spectral indices
 (NDVI, NDRE, EVI) that are used as model input features**. This means:
 
-- Classifiers will partly learn the deterministic rule that created the labels.
-- Reported accuracy is an **upper bound for spectral separability**, not an
-  independently validated disease-detection benchmark.
-- Results should be described as *spectral proxy classification*, not
-  *crop disease detection*.
+- Classifiers partly learn the deterministic rule that created the labels.
+- Reported accuracy is an **upper bound on spectral proxy separability**,
+  not independently validated disease detection accuracy.
+- "Diseased" identifies the lowest vegetation-health tertile spectrally.
+  It is a **proxy class name**, not a pathology-confirmed diagnosis.
 
-The correct framing: "classifies Sentinel-2 observations into spectrally derived
-crop-condition proxy classes (Healthy, Stressed, Diseased). These labels are
-generated from a vegetation-health composite and have not yet been validated
-against independent field diagnoses."
+Use language like **"spectrally derived crop-condition proxy class"**, not
+"disease detection" or "field-verified stress classification".
+
+---
 
 ## Collection Methodology
 
-Satellite data was retrieved using the `COPERNICUS/S2_SR_HARMONIZED` image
-collection through the GEE Python API (`src/collect_gee_data.py`).
+Satellite data was retrieved using `COPERNICUS/S2_SR_HARMONIZED` via the
+GEE Python API (`src/collect_gee_data.py`). For each location and season:
 
-For each site and season window:
-1. Images are filtered by season date range (Rabi: Nov 15 – Apr 30; Kharif: May 1 – Nov 14)
-2. Images with >30% cloud cover are discarded (CLOUDY_PIXEL_PERCENTAGE filter)
-3. Per-image cloud masking via QA60 bit flags (opaque clouds bit 10, cirrus bit 11)
-4. A **median composite** is computed over all cloud-free images
-5. Spectral indices are derived from the composite bands:
-   - NDVI = (B8−B4) / (B8+B4)
-   - EVI = 2.5 × (B8−B4) / (B8+6·B4−7.5·B2+1)
-   - NDWI = (B3−B8) / (B3+B8)
-   - **NDRE = (B8A−B5) / (B8A+B5)** using native S2 red-edge bands B5 (705 nm) and B8A (865 nm)
-   - LAI = 3.618 × EVI − 0.118
-   - BSI = ((B11+B4)−(B8+B2)) / ((B11+B4)+(B8+B2))
-6. Temporal NDVI statistics (std, min, max) computed across all composite images
-7. Pixel values extracted via `reduceRegion` with a **1 km buffer** around each district centroid, scale=10 m
+1. Filter by season date range:
+   - **Rabi**: November 15 (previous year) – April 30
+   - **Kharif**: May 1 – November 14
+2. Discard images with >30% cloud cover (`CLOUDY_PIXEL_PERCENTAGE`)
+3. Per-image cloud masking via QA60 bit 10 (opaque) and bit 11 (cirrus)
+4. Compute **median composite** over all cloud-free images
+5. Derive spectral indices (see below) from composite bands
+6. Extract pixel values via `reduceRegion`, scale=10 m, 1 km buffer
 
-## Province and Crop Coverage
+Spectral indices derived **in GEE** using native Sentinel-2 bands:
 
-*Generated directly from `agrosense_crop_stress_dataset.csv`.*
+| Index | Formula | Bands used |
+|---|---|---|
+| NDVI | (B8−B4)/(B8+B4) | B4 (Red), B8 (NIR broad) |
+| EVI | 2.5·(B8−B4)/(B8+6·B4−7.5·B2+1) | B2, B4, B8 |
+| NDWI | (B3−B8)/(B3+B8) | B3 (Green), B8 |
+| **NDRE** | **(B8A−B5)/(B8A+B5)** | **B5 (705 nm), B8A (865 nm)** |
+| LAI | 3.618·EVI − 0.118 | — |
+| BSI | ((B11+B4)−(B8+B2))/((B11+B4)+(B8+B2)) | B2, B4, B8, B11 |
 
-| Province    | Sites | Crops | Observations |
-|-------------|------:|-------|-------------:|
-| Punjab      | 34    | wheat, cotton, rice, sugarcane | 619 |
-| Balochistan | 22    | wheat, mango, cotton | 396 |
-| KPK         | 23    | wheat, rice, sugarcane, mango | 411 |
-| Sindh       | 20    | cotton, wheat, sugarcane, rice | 360 |
+> NDRE uses the native S2 red-edge bands B5 (705 nm) and B8A (865 nm).
+> The local `compute_indices()` function in `feature_engineering.py` was
+> corrected to require these bands and raise an error if absent.
 
-| Crop      | Observations | % |
-|-----------|-------------:|---|
-| Wheat     | 756 | 42.3% |
-| Rice      | 308 | 17.2% |
-| Cotton    | 272 | 15.2% |
-| Mango     | 217 | 12.1% |
-| Sugarcane | 233 | 13.1% |
+---
+
+## Derived / Imputed Columns
+
+Three columns in the published CSV are **imputed**, not observed:
+
+| Column | Method | Note |
+|---|---|---|
+| `soil_moisture` | Linear rescaling of NDWI to [16, 28]% | Proxy, not in-situ |
+| `temp_celsius` | Climatology default ± noise: rabi=19°C, kharif=30°C | Imputed |
+| `rainfall_mm` | Climatology default ± noise: rabi=120mm, kharif=280mm | Imputed |
+
+Exact imputation rules are in `src/build_dataset.py`.
+
+---
+
+## Province and Crop Coverage *(derived from CSV)*
+
+| Province    | Locations | Observations | Crops |
+|-------------|----------:|-------------:|-------|
+| Punjab      | 34        | 619          | wheat, cotton, rice, sugarcane |
+| KPK         | 23        | 411          | wheat, rice, sugarcane, mango |
+| Balochistan | 22        | 396          | wheat, mango, cotton |
+| Sindh       | 20        | 360          | cotton, wheat, sugarcane, rice |
+
+| Crop      | Count | % |
+|-----------|------:|---|
+| wheat     | 883   | 49.4% |
+| rice      | 308   | 17.2% |
+| cotton    | 272   | 15.2% |
+| sugarcane | 216   | 12.1% |
+| mango     | 107   | 6.0% |
+
+### Hafizabad note
+
+`PB15 Hafizabad` (lat=32.0711, lon=73.6883, crop=rice) and
+`PB34 Hafizabad2` (lat=32.0711, lon=73.7500, crop=wheat) share the same
+latitude but differ by ~6.8 km longitude and represent different crops.
+They are retained as distinct sampling locations with different seasonal
+spectral signatures.
+
+---
 
 ## Label Derivation
-
-The `crop_stress_label` column is derived from a vegetation health composite:
 
 ```
 score = 0.5 × NDVI + 0.3 × NDRE + 0.2 × EVI
 ```
 
-Tertile thresholds split the score distribution into three classes:
+Tertile thresholds on the full dataset:
 
-| Label    | Score range   | Agronomic interpretation           |
-|----------|---------------|------------------------------------|
-| Healthy  | top tertile   | Strong photosynthetic activity     |
-| Stressed | middle tertile| Reduced vigour / moisture stress   |
-| Diseased | bottom tertile| Severe chlorophyll loss            |
+| Proxy class | Score range | Spectral interpretation |
+|---|---|---|
+| Healthy | top tertile (≥ q₆₆) | Strong photosynthetic activity |
+| Stressed | middle tertile | Reduced vegetation vigour |
+| Diseased | bottom tertile (< q₃₃) | Severe chlorophyll reduction |
 
-**⚠ These labels are spectrally derived, not ground-truthed.**  
-Ground-truth validation is an active area of ongoing work.
+**Class distribution:** Healthy=596, Stressed=595, Diseased=595 (≈balanced)
 
-## Class Balance
+---
 
-| Class    | Count | Fraction |
-|----------|------:|---------:|
-| Healthy  | 596   | 33.4%    |
-| Stressed | 595   | 33.3%    |
-| Diseased | 595   | 33.3%    |
-| **Total**| **1,786** | |
+## Classification Features (9 total)
 
-## Train / Test Split
+```
+ndvi, evi, ndwi, ndre, lai, bsi, ndvi_std, ndvi_min, ndvi_max
+```
 
-The **correct** split for this dataset is **field-grouped**:
+Six spectral indices + three temporal NDVI statistics.
+
+---
+
+## Train/Test Split (location-grouped)
 
 ```python
 from sklearn.model_selection import GroupShuffleSplit
 
 splitter = GroupShuffleSplit(n_splits=1, test_size=0.20, random_state=42)
 train_idx, test_idx = next(splitter.split(X, y, groups=df["location_id"]))
+# → 1,425 train obs / 79 locations | 361 test obs / 20 locations
 ```
 
-This ensures **no field site appears in both training and test sets**, which would
-otherwise cause optimistic accuracy estimates from seasonal observations of the
-same location. Observations of the same site across different seasons are
-correlated, so a random split leaks this information.
+See `results/split_manifest.csv` for the exact location-to-partition mapping.
 
-**Do not use `train_test_split` without groups on this dataset.**
+**Do not use `train_test_split` without groups** — seasonal observations
+from the same centroid are correlated; a random split leaks this information.
 
-Cross-validation should use `StratifiedGroupKFold`, not plain `StratifiedKFold`.
+---
 
-## Feature Columns
+## Seasons
 
-The nine features used for classification (six derived indices + three temporal statistics):
+19 unique season labels:
+- **Kharif** (May–Nov): 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024
+- **Rabi** (Nov–Apr): 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024
 
-```
-ndvi, evi, ndwi, ndre, lai, bsi, ndvi_std, ndvi_min, ndvi_max
-```
+Observations span 2015–2024 across both growing seasons,
+not "ten growing seasons" as sometimes stated (there are 19 season windows).
 
-See `data/data_dictionary.csv` for full column definitions.
-
-## Historical Archive
-
-A broader 4,730-sample archive spanning Landsat 7 (2000–2012), Landsat 8
-(2013–2014), and Sentinel-2 (2015–2024) is available on request for long-term
-temporal trend analysis.
+---
 
 ## Citation
 
-If you use this dataset, please cite using `CITATION.cff` at the repository root.
+See `CITATION.cff` at the repository root.
