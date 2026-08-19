@@ -125,9 +125,12 @@ The principal contributions of this paper are:
         five specialised ML models, and real-time weather intelligence within a
         single cloud-native platform serving both mobile and desktop clients.
   \item A comparative evaluation of five classification algorithms on
-        Sentinel-2 spectral indices for crop stress detection under Pakistan
-        agronomic conditions, providing benchmark results absent from prior
-        literature for this geographic context.
+        Sentinel-2 spectral indices for spectral proxy crop-condition
+        classification under Pakistan agronomic conditions, using location-grouped
+        evaluation with nested cross-validation. Labels are derived from the same
+        spectral indices used as features (see Section~\ref{sec:experiments});
+        results quantify proxy-class separability, not independently validated
+        crop-disease diagnosis.
   \item A bilingual (English/Urdu) cross-platform interface design enabling
         farmer and agronomist accessibility across Pakistan's linguistic
         landscape.
@@ -388,10 +391,13 @@ in dense canopies where NDVI plateaus at LAI~$\approx$~3, rendering it more
 sensitive for high-biomass crops such as sugarcane and rice.
 
 \textbf{NDWI} (Normalized Difference Water Index) uses the contrast between
-green ($B_3$, 560~nm) and NIR ($B_8$). It is sensitive to liquid water retained
-within leaf cells: negative values indicate moisture stress, whereas values
-approaching $+1$ indicate water-saturated vegetation or open water. In AgroSense
-it serves as the primary irrigation stress indicator.
+green ($B_3$, 560~nm) and NIR ($B_8$, 842~nm). This green-NIR formulation is
+sensitive to open-water bodies and surface-water presence; it also responds to
+canopy moisture conditions at the landscape scale. Negative values indicate
+denser or drier vegetation; values approaching $+1$ indicate open water or
+saturated surfaces. In AgroSense it is used as a surface/open-water-sensitive
+spectral index. Note: a shortwave-infrared formulation using NIR/SWIR bands
+would be more specific to vegetation liquid-water content in future iterations.
 
 \textbf{NDRE} (Normalized Difference Red-Edge Index) exploits Sentinel-2's
 red-edge band ($B_5$, 705~nm), which occupies the steep reflectance transition
@@ -551,11 +557,15 @@ Five classifiers are evaluated on the crop-condition proxy classification task.
 The dataset comprises 1,786 observations (596 Healthy, 595 Stressed, 595 Diseased)
 described by nine Sentinel-2-derived spectral features (six derived indices:
 NDVI, EVI, NDWI, NDRE, LAI, BSI; and three temporal NDVI statistics:
-NDVI\_std, NDVI\_min, NDVI\_max), collected from 99 georeferenced agricultural
+NDVI\_std, NDVI\_min, NDVI\_max), collected from 99 district/city-centroid
 sampling locations across all four provinces of Pakistan spanning 19 crop-season
-windows (2015--2024). Feature scaling via \texttt{StandardScaler} is applied
-inside a \texttt{Pipeline} for SVM and $k$-NN; tree-based models receive raw
-features.
+windows (2015--2024). Sampling uses a~$\sim$1~km buffer around each centroid
+without a cropland mask; extracted spectral values may therefore include
+contributions from mixed land-cover pixels (roads, built-up areas, bare soil).
+Crop-type assignment is a nominal primary-crop category per location, not
+independently verified for every season. Feature scaling via
+\texttt{StandardScaler} is applied inside a \texttt{Pipeline} for SVM and
+$k$-NN; tree-based models receive raw features.
 
 To prevent data leakage from repeated seasonal observations at the same
 sampling location, the train/test split is performed at the sampling-location
@@ -568,6 +578,38 @@ per fold. Reported metrics are macro-averaged precision, recall, and F1 on the
 held-out test set, plus nested cross-validated macro F1 (mean and standard
 deviation across 5 outer folds). Model training is implemented in
 scikit-learn~\cite{sklearn} and XGBoost~\cite{chen2016xgboost}.
+
+\subsection{Spectral Rule Baseline}
+\label{sec:rule_baseline}
+
+Because the proxy labels are defined deterministically by the spectral score
+$s = 0.5{\cdot}\text{NDVI} + 0.3{\cdot}\text{NDRE} + 0.2{\cdot}\text{EVI}$
+with global tertile thresholds $q_{33}{=}0.1403$ and $q_{66}{=}0.1915$
+(derived from the full dataset of 1,786 observations), we report two clearly
+distinguished rule baselines:
+
+\textbf{(1) Benchmark-definition rule.} Applying the fixed global thresholds
+to the full dataset recovers the proxy labels with accuracy~=~0.9994 and
+macro~F1~=~0.9994. This near-perfect recovery is \textit{expected by
+construction}—the labels \textit{are} these thresholds applied to this score.
+It is not a predictive model and cannot be compared to held-out evaluation.
+
+\textbf{(2) Training-derived threshold baseline.} To establish an inductive
+rule with no threshold leakage, $q_{33}$ and $q_{66}$ are recomputed from the
+training partition only ($q_{33}^{\text{train}}{=}0.1458$,
+$q_{66}^{\text{train}}{=}0.1965$), then applied to the held-out test
+locations. This yields held-out accuracy~=~0.9363 and macro
+F1~=~0.9289. Nested 5-fold outer \texttt{StratifiedGroupKFold} evaluation
+(thresholds recomputed per outer fold from training data only) produces nested
+CV macro~F1~=~0.9641~$\pm$~0.0111.
+
+The training-derived rule baseline (macro F1~=~0.9641 nested CV) represents
+the minimum bar that any learned classifier should exceed. The ML classifiers
+reported in Table~\ref{tab:overall} (XGBoost nested CV F1~=~0.983, RF~=~0.980)
+do exceed this threshold by approximately 1.5--2 percentage points, suggesting
+that the nonlinear models capture location-group-generalising structure beyond
+the single linear spectral score, even within this spectrally proxied label
+regime. Results are saved in \texttt{results/rule\_baseline\_results.csv}.
 
 \subsection{Overall Classification Results}
 
@@ -620,8 +662,8 @@ across all five classifiers.
 \subsection{Per-Class Analysis}
 
 Table~\ref{tab:perclass} details per-class precision, recall, and F1 for the
-production Random Forest model on the 361-sample held-out test set (20 sites
-not seen during training).
+production Random Forest model on the 361-sample held-out test set (20 sampling
+locations not seen during training).
 
 \begin{table}[htbp]
   \caption{Per-Class Results --- Random Forest (Production Model)}
@@ -655,8 +697,10 @@ Fig.~\ref{fig:confusion}.
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\columnwidth]{fig3_confusion_matrices.png}
-  \caption{Normalized confusion matrices for five ML classifiers. Cell values
-           show normalised proportion (raw count in parentheses).}
+  \caption{Normalized confusion matrices for five classifiers on the
+           held-out location-grouped test set (361 observations, 20 sampling
+           locations). Cell values show normalized proportions; raw counts
+           are not displayed.}
   \label{fig:confusion}
 \end{figure}
 
@@ -818,8 +862,8 @@ with no embedded API keys.
 \section{Data and Code Availability}
 
 The dataset (1,786 Sentinel-2 observations), training and evaluation scripts,
-GEE data collection pipeline, Jupyter notebook, and pre-trained models are
-publicly available at:
+GEE data collection pipeline, Jupyter notebook, and a pre-trained Random Forest
+production model are publicly available at:
 
 \begin{center}
 \url{https://github.com/ALI-SHAHMEER/agrosense-pakistan-crop-stress}
@@ -850,7 +894,7 @@ contain multiple seasonal observations per sampling location; naive random
 splits inflate reported accuracy by allowing the same location to appear in
 both partitions.
 Third, a single stateless REST API deployed on Google Cloud
-Run~\cite{gorelick2017,fastapi} can serve both a Flutter mobile
+Run~\cite{googlecloudrun,fastapi} can serve both a Flutter mobile
 application~\cite{flutter} and a PyQt6 desktop application, enabling
 simultaneous support for field and office use cases without code duplication.
 
@@ -942,9 +986,8 @@ A.~Htitiou \textit{et al.},
 ``A comparative analysis of different phenological information retrieved from
 Sentinel-2 time series images to improve crop classification: A machine
 learning approach,''
-\textit{Geocarto Int.}, 2020,
+\textit{Geocarto Int.}, vol.~37, no.~5, pp.~1426--1449, 2022,
 \href{https://doi.org/10.1080/10106049.2020.1768593}{doi: 10.1080/10106049.2020.1768593}.
-[MISSING INFORMATION: volume, issue, page numbers]
 
 \bibitem{omia2023}
 E.~Omia \textit{et al.},
@@ -958,9 +1001,8 @@ C.~H. Ojeilua \textit{et al.},
 ``High-resolution stress detection in crops: Integrating satellite and drone
 remote sensing for resilient agriculture,''
 \textit{Afr.\ J.\ Agric.\ Sci.\ Food Res.}, vol.~19, no.~1,
-p.~447, 2025,
+pp.~447--467, 2025,
 \href{https://doi.org/10.62154/ajasfr.2025.019.01037}{doi: 10.62154/ajasfr.2025.019.01037}.
-[MISSING INFORMATION: end page number]
 
 \bibitem{karthikeyan2020}
 L.~Karthikeyan, M.~Chawla, and A.~K. Mishra,
@@ -1051,6 +1093,11 @@ pp.~20--29, Nov.\ 2019,
 F.~Pedregosa \textit{et al.},
 ``Scikit-learn: Machine learning in Python,''
 \textit{J.\ Mach.\ Learn.\ Res.}, vol.~12, pp.~2825--2830, Nov.\ 2011. [Online]. Available: \url{https://www.jmlr.org/papers/volume12/pedregosa11a/pedregosa11a.pdf}.
+
+\bibitem{googlecloudrun}
+Google LLC,
+``Cloud Run — Fully managed serverless platform,'' 2024. [Online].
+Available: \url{https://cloud.google.com/run}.
 
 \end{thebibliography}
 

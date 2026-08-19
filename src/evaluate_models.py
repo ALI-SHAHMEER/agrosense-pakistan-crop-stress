@@ -1,21 +1,30 @@
 """
 evaluate_models.py
-Read saved trained models and regenerate figures/per-class report.
+Load the saved Random Forest model and regenerate a subset of outputs
+without retraining or re-running GridSearchCV / nested CV.
 
 This script READS results produced by train_models.py and does NOT
 overwrite classifier_results.csv with incomplete data.
 
-If you want to re-run the full experiment (GridSearchCV + nested CV),
-run train_models.py instead.
+For the full experiment (GridSearchCV + nested CV), run train_models.py.
+For updated paper figures, run build_paper_figures.py.
 
 Usage:
     python src/evaluate_models.py
 
-Outputs regenerated (figures only — CSV comes from train_models.py):
-    results/confusion_matrices.png
-    results/feature_importance.png
-    results/f1_comparison.png
-    results/per_class_report.txt   — human-readable classification report
+What this script does:
+    - Loads the saved Random Forest model (models/random_forest.pkl)
+    - Prints the RF per-class classification report
+    - Saves results/per_class_report.txt
+    - Saves results/confusion_rf.png  (RF confusion matrix only)
+    - Regenerates results/f1_comparison.png from saved classifier_results.csv
+    - Regenerates results/feature_importance.png from saved feature_importance.csv
+
+What this script does NOT do:
+    - Does NOT retrain any model
+    - Does NOT recompute CV metrics
+    - Does NOT regenerate the multi-model confusion_matrices.png
+      (that requires all trained models in memory, which train_models.py holds)
 """
 
 import sys

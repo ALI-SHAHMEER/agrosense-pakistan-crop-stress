@@ -1,0 +1,8 @@
+{
+  "score_formula": "0.5*NDVI + 0.3*NDRE + 0.2*EVI",
+  "q33": 0.1403,
+  "q66": 0.19154,
+  "scope": "full released dataset (1786 observations)",
+  "purpose": "benchmark label construction",
+  "note": "These thresholds were derived from the FULL dataset before any train/test split. The class labels in the released CSV are fixed by these thresholds. They are NOT derived from training data alone. A training-derived threshold baseline must recompute q33/q66 from training folds only to avoid threshold leakage."
+}

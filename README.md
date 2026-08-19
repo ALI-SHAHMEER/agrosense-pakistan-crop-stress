@@ -134,7 +134,12 @@ Sentinel-2 Level-2A spectral composites from
 `COPERNICUS/S2_SR_HARMONIZED` via the GEE API, cloud-masked (QA60),
 median-composited per season window, extracted with a 1 km buffer at
 **99 district/city-centroid sampling locations** — not individually
-surveyed farm fields.
+surveyed farm field polygons.
+
+> **No cropland mask** is applied: the 1 km buffer may include mixed
+> land-cover pixels (roads, bare soil, built-up areas). `crop_type` is a
+> nominal primary-crop category per location, not independently verified
+> for each season observation.
 
 **Nine classification features** (six derived indices + three temporal statistics):
 

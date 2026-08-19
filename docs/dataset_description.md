@@ -4,17 +4,27 @@
 
 `data/agrosense_crop_stress_dataset.csv` contains **1,786 Sentinel-2
 Level-2A observations** collected via the Google Earth Engine (GEE) API from
-**99 georeferenced agricultural sampling locations** — district and city
-centroids with ~1 km buffers — across all four provinces of Pakistan
+**99 district/city-centroid sampling locations** — ~1 km buffer around each
+administrative centroid — across all four provinces of Pakistan
 (Punjab, Sindh, Balochistan, KPK), spanning **19 crop-season windows**
 (Kharif 2015–2024 and Rabi 2016–2024).
 
 ### Important: sampling location definition
 
 Coordinates are **publicly available district/city centroids**, not
-individually surveyed or GPS-verified farm field boundaries.
+individually surveyed or GPS-verified farm field polygons.
 Results represent location-grouped performance across administrative-unit
-centroids, not individual farm-field generalisation.
+centroid buffers, not individual farm-field generalisation.
+
+**No cropland mask** is applied during extraction. The 1 km buffer may include
+mixed land-cover pixels (roads, built-up areas, bare soil, water bodies, or
+non-agricultural vegetation) that contribute to the extracted spectral values.
+This is a known limitation of the current sampling methodology.
+
+**`crop_type` is a nominal primary-crop category** assigned to each sampling
+location for contextual analysis. Crop identity was **not independently
+verified for each location-season observation**; it is a static label per
+location derived from dominant regional cropping patterns.
 
 ---
 
@@ -112,15 +122,25 @@ spectral signatures.
 score = 0.5 × NDVI + 0.3 × NDRE + 0.2 × EVI
 ```
 
-Tertile thresholds on the full dataset:
+Tertile thresholds derived from the **full released dataset** (not from training data):
 
 | Proxy class | Score range | Spectral interpretation |
 |---|---|---|
-| Healthy | top tertile (≥ q₆₆) | Strong photosynthetic activity |
+| Healthy | top tertile (≥ q₆₆ = 0.1915) | Strong photosynthetic activity |
 | Stressed | middle tertile | Reduced vegetation vigour |
-| Diseased | bottom tertile (< q₃₃) | Severe chlorophyll reduction |
+| Diseased | bottom tertile (< q₃₃ = 0.1403) | Severe chlorophyll reduction |
 
 **Class distribution:** Healthy=596, Stressed=595, Diseased=595 (≈balanced)
+
+Exact threshold values are stored in `data/label_definition.json`.
+
+**⚠ Threshold leakage note:** Because q₃₃ and q₆₆ were computed from the full
+dataset before any train/test split, the global thresholds encode information
+about the held-out partition. This is a methodological limitation of the
+released benchmark labels. For fair inductive evaluation, use the
+training-derived threshold baseline in `src/rule_baseline.py`, which recomputes
+thresholds from training data only and achieves held-out macro F1 = 0.929
+(nested CV = 0.964 ± 0.011).
 
 ---
 

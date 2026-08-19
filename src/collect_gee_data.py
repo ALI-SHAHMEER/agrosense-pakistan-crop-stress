@@ -1,7 +1,7 @@
 """
 collect_gee_data.py
 Collect Sentinel-2 spectral composites from Google Earth Engine for
-Pakistani agricultural field sites and save them to CSV.
+Pakistani district/city-centroid sampling locations and save them to CSV.
 
 Requirements:
   pip install earthengine-api
@@ -40,9 +40,11 @@ logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s  %(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
 
-# ── Field sites ───────────────────────────────────────────────────────────────
-# 116 sites across Punjab (PB), Sindh (SD), Balochistan (BL), KPK (KP)
-# Coordinates are district/city centroids — publicly available.
+# ── Sampling locations ────────────────────────────────────────────────────────
+# 99 district/city-centroid sampling locations across Punjab (PB), Sindh (SD),
+# Balochistan (BL), KPK (KP). Coordinates are publicly available centroids.
+# Each location is sampled with a ~1 km buffer. No individual field polygons
+# or cropland masks are applied; mixed land-cover pixels may be included.
 LOCATIONS = [
     # ── Punjab ────────────────────────────────────────────────────────────────
     ("PB01", "Lahore",      "Punjab",      31.5204, 74.3587, "wheat"),

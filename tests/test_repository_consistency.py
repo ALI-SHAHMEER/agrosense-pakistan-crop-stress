@@ -9,6 +9,7 @@ or:
     python tests/test_repository_consistency.py
 """
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -17,6 +18,10 @@ import pandas as pd
 import pytest
 
 ROOT = Path(__file__).parent.parent
+
+
+def _file_md5(path: Path) -> str:
+    return hashlib.md5(path.read_bytes()).hexdigest()
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -168,6 +173,96 @@ def test_feature_importance_csv_has_nine_rows():
         pytest.skip("feature_importance.csv not found")
     imp = pd.read_csv(p, index_col=0)
     assert len(imp) == 9, f"Expected 9 feature rows, got {len(imp)}"
+
+
+# ── Paper figure sync tests ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("result_file,paper_file", [
+    ("confusion_matrices.png",  "fig3_confusion_matrices.png"),
+    ("feature_importance.png",  "fig4_feature_importance.png"),
+    ("f1_comparison.png",       "fig5_accuracy_f1_comparison.png"),
+    ("perclass_f1_heatmap.png", "fig6_perclass_f1_heatmap.png"),
+])
+def test_paper_figure_matches_results(result_file, paper_file):
+    src = ROOT / "results" / result_file
+    dst = ROOT / "paper" / paper_file
+    if not src.exists():
+        pytest.skip(f"results/{result_file} not found — run train_models.py then build_paper_figures.py")
+    assert dst.exists(), f"paper/{paper_file} missing — run src/build_paper_figures.py"
+    assert _file_md5(src) == _file_md5(dst), (
+        f"paper/{paper_file} is stale — run src/build_paper_figures.py to sync"
+    )
+
+
+def test_paper_figures_exist():
+    for fig in ["fig3_confusion_matrices.png", "fig4_feature_importance.png",
+                "fig5_accuracy_f1_comparison.png", "fig6_perclass_f1_heatmap.png"]:
+        assert (ROOT / "paper" / fig).exists(), f"paper/{fig} missing"
+
+
+# ── Paper content sanity checks ───────────────────────────────────────────────
+
+@pytest.fixture(scope="module")
+def paper_text():
+    p = ROOT / "paper" / "agrosense_ieee.tex"
+    if not p.exists():
+        pytest.skip("paper/agrosense_ieee.tex not found")
+    return p.read_text()
+
+
+def test_paper_no_116_field_sites(paper_text):
+    assert "116" not in paper_text, \
+        "Paper still contains stale '116' reference — update to 99"
+
+
+def test_paper_no_missing_information(paper_text):
+    assert "[MISSING INFORMATION" not in paper_text, \
+        "Paper contains [MISSING INFORMATION] placeholder(s)"
+
+
+def test_paper_mentions_99_locations(paper_text):
+    assert "99" in paper_text, \
+        "Paper should mention 99 sampling locations"
+
+
+def test_paper_all_nine_features(paper_text):
+    for feat in ["NDVI", "EVI", "NDWI", "NDRE", "LAI", "BSI"]:
+        assert feat in paper_text, f"Feature '{feat}' not mentioned in paper"
+
+
+def test_paper_no_stale_field_sites_terminology(paper_text):
+    assert "116 field sites" not in paper_text
+    assert "116 sites" not in paper_text
+
+
+# ── README sanity ─────────────────────────────────────────────────────────────
+
+def test_readme_mentions_99_locations():
+    readme = (ROOT / "README.md").read_text()
+    assert "99" in readme, "README should mention 99 sampling locations"
+
+
+def test_readme_no_116(readme_text=(ROOT / "README.md").read_text()):
+    assert "116" not in readme_text, "README still has stale '116' count"
+
+
+# ── Rule baseline artefacts ───────────────────────────────────────────────────
+
+def test_rule_baseline_csv_exists():
+    p = ROOT / "results" / "rule_baseline_results.csv"
+    if not p.exists():
+        pytest.skip("rule_baseline_results.csv not found — run src/rule_baseline.py")
+    df = pd.read_csv(p)
+    assert len(df) == 3, f"Expected 3 rows in rule_baseline_results.csv, got {len(df)}"
+
+
+def test_label_definition_json_exists():
+    p = ROOT / "data" / "label_definition.json"
+    assert p.exists(), "data/label_definition.json missing — run src/rule_baseline.py"
+    defn = json.loads(p.read_text())
+    assert "q33" in defn and "q66" in defn
+    assert 0 < defn["q33"] < defn["q66"] < 1, \
+        f"Thresholds out of expected range: q33={defn['q33']}, q66={defn['q66']}"
 
 
 if __name__ == "__main__":

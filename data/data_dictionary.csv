@@ -1,10 +1,10 @@
 Column,Type,Unit,Description
-location_id,string,,Unique site code (e.g. PB01 = Punjab site 1; SD=Sindh; BL=Balochistan; KP=KPK)
-location_name,string,,City or district name of the field site (publicly known district centroids)
+location_id,string,,Unique sampling-location code (e.g. PB01 = Punjab location 1; SD=Sindh; BL=Balochistan; KP=KPK)
+location_name,string,,City or district name of the administrative-centroid sampling location (publicly available)
 province,string,,Pakistani province: Punjab / Sindh / Balochistan / KPK
 season,string,,Growing season identifier (e.g. Kharif_2015 or Rabi_2016)
 season_type,string,,Season category: kharif (May–Nov) or rabi (Nov–Apr)
-crop_type,string,,Primary crop grown: wheat / rice / cotton / sugarcane / mango
+crop_type,string,,Nominal primary-crop category assigned to each sampling location for contextual analysis (wheat / rice / cotton / sugarcane / mango). Crop identity was not independently verified for each location-season observation; it is a static label per location derived from dominant regional cropping patterns.
 lat,float,decimal degrees,Latitude of district centroid (publicly available administrative data)
 lon,float,decimal degrees,Longitude of district centroid (publicly available administrative data)
 ndvi,float,dimensionless [-1 to 1],Normalized Difference Vegetation Index — (B8-B4)/(B8+B4)

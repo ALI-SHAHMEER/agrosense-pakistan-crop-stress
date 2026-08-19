@@ -1,0 +1,4 @@
+Baseline,Evaluation,Accuracy,Macro_F1,Nested_CV_F1_Mean,Nested_CV_F1_Std,Note
+Benchmark-definition rule,Full dataset (all 1786 obs),0.9994,0.9994,,,Uses global q33/q66 that DEFINE the benchmark labels. Near-perfect recovery is expected by construction — this is NOT a predictive model.
+Training-derived threshold rule,Held-out location-grouped test set,0.9363,0.9289,,,q33/q66 derived from training partition only (no leakage). Applied to held-out locations unseen during threshold fitting.
+Training-derived threshold rule,Nested CV (5-fold outer StratifiedGroupKFold),,,0.9641,0.0111,Thresholds recomputed from outer-fold training data each fold. Provides an unbiased estimate of inductive rule generalisation.
