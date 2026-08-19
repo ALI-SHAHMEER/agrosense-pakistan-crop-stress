@@ -766,28 +766,44 @@ server-side; the mobile client holds only a short-lived, revocable JWT token
 with no embedded API keys.
 
 % ─────────────────────────────────────────────────────────────────────────────
+\section{Data and Code Availability}
+
+The dataset (1,786 Sentinel-2 observations), training and evaluation scripts,
+GEE data collection pipeline, Jupyter notebook, and pre-trained models are
+publicly available at:
+
+\begin{center}
+\url{https://github.com/ALI-SHAHMEER/agrosense-pakistan-crop-stress}
+\end{center}
+
+The repository includes a data dictionary, full methodology documentation, and
+pinned dependency versions to support exact replication of the reported results.
+
+% ─────────────────────────────────────────────────────────────────────────────
 \section{Conclusion}
 
 AgroSense demonstrates that satellite remote sensing, machine learning, and
 real-time weather intelligence can be integrated into an accessible mobile
 platform calibrated to the agronomic and linguistic context of Pakistan's
-smallholder farming sector. Three findings emerge from this work. First, six
-Sentinel-2-derived spectral indices supplemented by temporal NDVI statistics
-provide sufficient discriminative signal for reliable three-class crop stress
-classification, with Random Forest~\cite{breiman2001} achieving 94.12\% test
-accuracy and a 5-fold cross-validated macro F1 of 0.973. Second, Random Forest
-outperforms XGBoost and $k$-NN at equivalent parameter budgets on this dataset,
-consistent with the ensemble's established robustness under small,
-mixed-feature agricultural datasets. Third, a single stateless REST API
-deployed on Google Cloud Run~\cite{gorelick2017,fastapi} can serve both a
-Flutter mobile application~\cite{flutter} and a PyQt6 desktop application,
-enabling simultaneous support for field and office use cases without code
-duplication.
+smallholder farming sector. Three findings emerge from this work. First, nine
+Sentinel-2 spectral features (six derived indices and three temporal NDVI
+statistics) provide sufficient discriminative signal for spectral proxy
+crop-condition classification across all four provinces of Pakistan, with
+SVM~(RBF) achieving the highest test accuracy (98.34\%) and XGBoost achieving
+the best cross-validated macro F1 (0.983) under field-grouped evaluation.
+Second, field-level train/test separation (\texttt{GroupShuffleSplit} on site
+identifiers) is essential for honest accuracy estimation when datasets contain
+multiple seasonal observations per location; naive random splits inflate
+reported accuracy by allowing the same site to appear in both partitions.
+Third, a single stateless REST API deployed on Google Cloud
+Run~\cite{gorelick2017,fastapi} can serve both a Flutter mobile
+application~\cite{flutter} and a PyQt6 desktop application, enabling
+simultaneous support for field and office use cases without code duplication.
 
-Future work will focus on expanding the labelled dataset, incorporating
-multi-temporal deep learning architectures, and conducting formal user studies
-with smallholder farmers to evaluate decision quality under real field
-conditions.
+Future work will focus on ground-truth field validation of the spectrally
+derived class labels, incorporation of multi-temporal deep learning
+architectures, and formal user studies with smallholder farmers to evaluate
+decision quality under real field conditions.
 
 % ─────────────────────────────────────────────────────────────────────────────
 \begin{thebibliography}{29}
