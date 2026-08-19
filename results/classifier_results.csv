@@ -1,0 +1,6 @@
+Algorithm,Accuracy_pct,Precision_Macro,Recall_Macro,F1_Macro,CV_F1_Macro,Notes
+Random Forest,98.88,0.989,0.989,0.989,0.985,Production model
+XGBoost,98.32,0.983,0.983,0.983,0.982,
+Gradient Boosting,98.60,0.986,0.986,0.986,0.984,
+SVM (RBF),98.60,0.986,0.986,0.986,0.985,
+k-NN,95.81,0.958,0.958,0.958,0.956,

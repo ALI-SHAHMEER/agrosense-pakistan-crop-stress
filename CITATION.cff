@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this dataset or code, please cite as below."
+title: "AgroSense: Satellite-Based Crop Stress Classification for Pakistan"
+authors:
+  - family-names: Shahmeer
+    given-names: Ali
+    orcid: ""
+version: "1.0.0"
+date-released: "2024-08-19"
+url: "https://github.com/ALI-SHAHMEER/agrosense-pakistan-crop-stress"
+abstract: >
+  AgroSense is a crop stress classification system that uses Sentinel-2
+  satellite imagery collected via the Google Earth Engine API to classify
+  Pakistani agricultural fields into Healthy, Stressed, or Diseased states.
+  This repository contains 1,786 real Sentinel-2 observations from 116 field
+  sites across all four provinces of Pakistan over ten growing seasons
+  (2015-2024), along with the training code for five ML classifiers.
+keywords:
+  - remote sensing
+  - precision agriculture
+  - crop stress
+  - Sentinel-2
+  - machine learning
+  - Pakistan
+  - Google Earth Engine
+license: MIT
