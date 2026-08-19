@@ -1,0 +1,987 @@
+\documentclass[conference]{IEEEtran}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage[colorlinks=true,urlcolor=blue,linkcolor=black,citecolor=black]{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8}
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\title{AgroSense: Satellite-Based Crop Stress Classification and Smart Farming
+       Decision Support for Pakistan Smallholder Agriculture}
+
+\author{
+  \IEEEauthorblockN{Ali Shahmeer \quad Basit Hassan, MS \quad Kabir Ghoto, PhD}
+  \IEEEauthorblockA{
+    \textit{Department of Software Engineering}\\
+    \textit{Sindh Madressatul Islam University}\\
+    Karachi, Pakistan\\
+    areo5459@gmail.com
+  }
+}
+
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+Pakistan's agricultural sector, contributing approximately 24\% of GDP while
+employing over 37\% of the national workforce, continues to incur significant
+crop losses attributable to water stress, disease outbreaks, and sub-optimal
+input application. Conventional field scouting is labour-intensive, infrequent,
+and dependent on expert availability. This paper presents AgroSense, an
+integrated agricultural intelligence platform that processes Sentinel-2 and
+Landsat-8 satellite imagery via Google Earth Engine (GEE), runs five machine
+learning models trained on real Pakistan field data, and delivers real-time
+weather intelligence from Open-Meteo. The system provides crop stress
+classification, irrigation recommendations, yield forecasting, soil health
+assessment, and variable-rate application (VRA) zone mapping through a
+cross-platform Flutter mobile application, a bilingual (English/Urdu) desktop
+application, and a RESTful API deployed on Google Cloud Run. For the crop stress
+classification task, a comparative evaluation of five ML algorithms---Random
+Forest, XGBoost, Gradient Boosting, SVM (RBF), and $k$-NN---is conducted on
+1,786 real Sentinel-2 observations from 116 field sites across all four
+provinces (Punjab, Sindh, Balochistan, and KPK) over ten growing seasons
+(2015--2024), collected directly via the Google Earth Engine API. Evaluation
+uses a field-grouped train/test split (\texttt{GroupShuffleSplit} on site
+identifiers) and 5-fold \texttt{StratifiedGroupKFold} cross-validation with
+\texttt{GridSearchCV} hyperparameter tuning to prevent data leakage from
+repeated seasonal observations of the same field. SVM (RBF) achieves the
+highest test accuracy (98.34\%) and XGBoost achieves the highest
+cross-validated macro F1-score (0.983). The Random Forest classifier (96.40\%
+test accuracy, CV macro F1~=~0.980) is selected as the production model on the
+basis of interpretability and feature importance transparency. Results confirm
+that nine Sentinel-2 spectral features provide sufficient discriminative signal
+for reliable spectral proxy crop-condition classification across Pakistan's
+diverse agronomic zones.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Crop stress classification, Google Earth Engine, machine learning, NDVI,
+Pakistan, precision agriculture, Random Forest, satellite remote sensing,
+Sentinel-2, smart farming.
+\end{IEEEkeywords}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+
+Pakistan's agricultural sector, which contributes approximately 24\% of GDP and
+employs over 37\% of the national workforce~\cite{pbs2024,pesurvey2025}, faces
+persistent crop losses attributable to preventable causes---water stress,
+disease, and sub-optimal fertiliser application---that remain elevated despite
+decades of government intervention. Smallholder farms, which
+constitute the majority of cultivated area across Punjab and Sindh, lack access
+to timely, actionable crop health intelligence. The Indus basin irrigation
+system, which supports an estimated 17 million hectares of irrigated cropland,
+faces compounding pressures from water scarcity and secondary
+salinisation~\cite{muzammil2020}. Satellite remote sensing combined with machine
+learning offers a scalable alternative: field conditions can be assessed at
+10-metre spatial resolution on a 5-day revisit cycle using the Sentinel-2
+constellation~\cite{drusch2012} without requiring physical site visits.
+
+Vegetation indices computed from multispectral imagery---particularly NDVI,
+EVI, and NDRE---have been shown to correlate strongly with crop health,
+chlorophyll content, and water stress~\cite{rouse1974,gitelson2002}. Emerging
+remote sensing platforms and cloud-based geospatial APIs have substantially
+lowered the computational barrier to field-scale crop monitoring in
+under-resourced agricultural research contexts~\cite{sishodia2020}. Google
+Earth Engine (GEE)~\cite{gorelick2017} enables cloud-scale processing of
+petabytes of satellite imagery, removing infrastructure barriers that previously
+confined such pipelines to well-resourced institutions. Ensemble classifiers
+such as Random Forest~\cite{breiman2001} and gradient boosting
+variants~\cite{chen2016xgboost} have demonstrated competitive performance on
+small-to-medium agricultural datasets, making them well-suited for deployment
+contexts where large labelled datasets are expensive to acquire.
+
+AgroSense addresses the disconnect between satellite-derived insights and
+actionable farm management by providing an end-to-end pipeline from raw
+satellite imagery to mobile-accessible recommendations. The system targets five
+critical decision points in crop management: (1)~crop health monitoring through
+early stress and disease detection; (2)~irrigation management for optimal timing
+and volume; (3)~yield forecasting for harvest readiness estimation; (4)~soil
+health assessment of pH, salinity, and organic matter; and (5)~variable-rate
+application (VRA) zone mapping for precision fertiliser scheduling.
+
+The principal contributions of this paper are:
+\begin{enumerate}
+  \item An end-to-end satellite-to-recommendation pipeline integrating GEE,
+        five specialised ML models, and real-time weather intelligence within a
+        single cloud-native platform serving both mobile and desktop clients.
+  \item A comparative evaluation of five classification algorithms on
+        Sentinel-2 spectral indices for crop stress detection under Pakistan
+        agronomic conditions, providing benchmark results absent from prior
+        literature for this geographic context.
+  \item A bilingual (English/Urdu) cross-platform interface design enabling
+        farmer and agronomist accessibility across Pakistan's linguistic
+        landscape.
+  \item A crop stress dataset comprising 1,786 real Sentinel-2 Level-2A
+        observations collected via Google Earth Engine from 116 field sites
+        across all four provinces of Pakistan over ten growing seasons
+        (2015--2024), supplemented by a 4,730-sample historical archive
+        spanning Landsat~7, Landsat~8, and Sentinel-2 (2000--2024), made
+        available as a reproducible evaluation benchmark.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Related Work}
+
+\subsection{Remote Sensing for Crop Monitoring}
+
+Satellite-based crop monitoring has been extensively validated across diverse
+agricultural systems. Rouse \textit{et al.}~\cite{rouse1974} established NDVI
+as a quantitative proxy for vegetation vigour, while Gitelson \textit{et
+al.}~\cite{gitelson2002} demonstrated that EVI and red-edge-based indices offer
+chlorophyll-sensitive characterisation superior to broadband NDVI in dense
+canopies. The Sentinel-2 constellation, with its 10~m spatial resolution and
+5-day revisit cycle, has since become the preferred source for plot-scale crop
+monitoring~\cite{immitzer2016}. Tamiminia \textit{et al.}~\cite{tamiminia2020},
+in a meta-analysis of 349 peer-reviewed GEE-based studies, confirmed that
+optical satellite imagery processed with Random Forest constitutes the most
+widely adopted paradigm for agricultural land monitoring at regional and global
+scales. Htitiou \textit{et al.}~\cite{htitiou2020} demonstrated that
+phenological metrics derived from Sentinel-2 NDVI and EVI time series
+substantially improve crop type discrimination over single-date classification,
+achieving 88\% overall accuracy with Random Forest. Omia \textit{et
+al.}~\cite{omia2023} provide a comprehensive review of spectral imaging
+technologies for field crop monitoring, confirming that this satellite--ML
+combination remains the leading methodology for scalable crop health assessment.
+Ojeilua \textit{et al.}~\cite{ojeilua2025} reviewed satellite and drone-based
+stress detection in developing-region agricultural systems, identifying NDVI,
+NDWI, and red-edge reflectance as the most diagnostically informative spectral
+features for drought, salinity, and nutrient stress. Most published systems
+process imagery in scheduled batch mode~\cite{tamiminia2020,htitiou2020};
+AgroSense instead provides on-demand analysis triggered directly from a mobile
+interface.
+
+\subsection{Machine Learning in Precision Agriculture}
+
+Karthikeyan \textit{et al.}~\cite{karthikeyan2020} survey ML methods in
+precision agriculture and identify ensemble classifiers---particularly Random
+Forest---as the dominant approach for crop health classification on field-scale
+datasets, owing to their robustness under small sample sizes and mixed feature
+types. XGBoost~\cite{chen2016xgboost} has demonstrated competitive or superior
+results on tabular agricultural data, while kernel-based SVMs have demonstrated
+strong performance on high-dimensional hyperspectral classification tasks.
+Maleki \textit{et al.}~\cite{maleki2024} demonstrated that combining
+Sentinel-1 SAR backscatter with Sentinel-2 vegetation indices achieves mean F1
+scores of 89.9--93.5\% for summer crop mapping, with XGBoost outperforming
+Random Forest and Multi-Layer Perceptron in multi-sensor configurations. Our
+comparative study directly evaluates these methods on Pakistan Sentinel-2 data,
+contributing benchmark results absent from prior literature for this geographic
+and agronomic context.
+
+\subsection{Smart Farming Decision Support Systems}
+
+Several platforms integrate satellite indices with weather data for farm
+management support. Wolfert \textit{et al.}~\cite{wolfert2017} characterise the
+``Big Data in Smart Farming'' paradigm, emphasising the need for systems that
+establish a feedback cycle from field sensing to farm management decision.
+Leading commercial precision agriculture platforms provide comparable
+functionality but target large-scale mechanised farms in North America and
+Europe. AgroSense is specifically designed for smallholder farms in South Asia,
+with explicit Urdu localisation and a zero-cost weather data source
+(Open-Meteo~\cite{zippenfenig2023}).
+
+\subsection{Yield Prediction and Crop Health in Pakistan}
+
+Remote sensing-based yield estimation has been validated at regional and field
+scales across diverse agronomic contexts. Ashfaq \textit{et
+al.}~\cite{ashfaq2025} introduced DeepAgroNet, a three-branch deep learning
+framework integrating GEE-processed satellite imagery, meteorological data, and
+soil characteristics for winter wheat yield prediction at the district level in
+southern Pakistan, with the CNN branch achieving an $R^2$ of 0.77 one month
+prior to harvest. Jamil \textit{et al.}~\cite{jamil2025} demonstrated that
+Sentinel-derived vegetation indices---including NDVI, EVI, SAVI, GDVI, and
+IVI---exhibit strong polynomial relationships with wheat crop age and health in
+Punjab, Pakistan, reporting $R^2$ values of 0.68--0.92. AgroSense's yield
+predictor integrates growing-degree features with temporal NDVI statistics and
+is calibrated against Pakistan Bureau of Statistics 2024 provincial
+averages~\cite{pbs2024} for wheat, rice, cotton, sugarcane, and mango---crops
+that collectively represent the majority of Pakistan's cultivated area.
+
+Collectively, the reviewed literature confirms the technical feasibility of
+satellite-based crop monitoring but reveals a consistent gap: no existing open
+system integrates GEE-derived spectral analysis, multi-model ML inference, and
+real-time weather intelligence within a single mobile-accessible platform
+calibrated for Pakistan's smallholder context. AgroSense directly addresses
+this gap.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{System Architecture}
+
+The system follows a three-tier architecture illustrated in
+Fig.~\ref{fig:architecture}. This separation was chosen to decouple
+computationally intensive satellite processing and ML inference from the client
+tier, enabling a single stateless API to serve both mobile and desktop
+interfaces without duplicating business logic. A satellite ingestion layer
+fetches and preprocesses Sentinel-2 and Landsat-8 imagery via GEE. A FastAPI
+backend~\cite{fastapi} running on Google Cloud Run performs ML inference and
+exposes a RESTful API. Two client tiers---a Flutter mobile
+application~\cite{flutter} and a PyQt6 desktop application---consume the API
+independently.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig1_architecture.png}
+  \caption{AgroSense three-tier system architecture.}
+  \label{fig:architecture}
+\end{figure}
+
+\subsection{Backend Technology Stack}
+
+Technology selection prioritised open-source components with strong geospatial
+and ML ecosystems and zero per-request licensing cost.
+Table~\ref{tab:stack} summarises the key backend components.
+
+\begin{table}[htbp]
+  \caption{Backend Technology Stack}
+  \label{tab:stack}
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Component} & \textbf{Technology} \\
+    \midrule
+    API Framework      & FastAPI 0.111~\cite{fastapi}, Uvicorn \\
+    Database           & PostgreSQL 16 + PostGIS 3~\cite{postgis} \\
+    ORM / Migrations   & SQLAlchemy 2.0, Alembic \\
+    Satellite Pipeline & GEE API (earthengine-api 0.1.403)~\cite{gorelick2017} \\
+    ML Runtime         & scikit-learn 1.4.2~\cite{sklearn}, XGBoost 2.0.3~\cite{chen2016xgboost} \\
+    Geospatial         & Rasterio 1.3.10, Shapely 2.0.4 \\
+    Weather            & Open-Meteo~\cite{zippenfenig2023} \\
+    Authentication     & JWT (python-jose), bcrypt \\
+    PDF Generation     & ReportLab 4.2.5~\cite{reportlab}, arabic-reshaper \\
+    Deployment         & Docker, Google Cloud Run \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Mobile Application}
+
+The mobile application is built with Flutter 3.44~\cite{flutter} (Dart~3.12),
+targeting Android (API~21+) and iOS from a single codebase. The application
+constitutes the primary interface through which farmers and agronomists interact
+with the AgroSense platform.
+
+\subsubsection{Architecture and State Management}
+The application follows a reactive widget architecture with a language switcher
+backed by observable state. All API communication is encapsulated in a singleton
+service layer that attaches a JWT Bearer token to every request; tokens are
+persisted locally across sessions. As a security design principle, no
+third-party credentials---GEE, Open-Meteo, or Gmail SMTP---are embedded in the
+client binary; all such secrets are held exclusively server-side on Cloud Run.
+
+\subsubsection{Screen Structure}
+Navigation is managed by a \texttt{MainShell} scaffold with a persistent
+field selector. The application comprises eight screens:
+
+\begin{itemize}
+  \item \textbf{LoginScreen} --- JWT-based authentication with persistent
+        token storage across sessions.
+  \item \textbf{FarmsScreen} --- Farm and field management; field boundaries
+        are defined by GPS polygon coordinates submitted to the PostGIS backend.
+  \item \textbf{DashboardScreen} --- The core analysis screen. A single user
+        interaction triggers a sequential four-stage pipeline: (1)~satellite
+        fetch via GEE, (2)~five ML model inference, (3)~current weather fetch,
+        and (4)~temporal NDVI anomaly detection. Results are displayed as
+        colour-coded cards with severity badges, providing a complete crop
+        health snapshot without requiring the user to navigate multiple screens.
+  \item \textbf{AnalyticsScreen} --- Interactive time-series charts of NDVI
+        and other spectral indices over a rolling 12-month window.
+  \item \textbf{ImageryScreen} --- Satellite imagery viewer with multi-band
+        selection (RGB true colour, NDVI false colour).
+  \item \textbf{SmartFarmingScreen} --- Seven-day weather forecast cards,
+        active alert list with severity indicators, and ideal planting date
+        recommendation.
+  \item \textbf{ProfileScreen} --- User account management.
+\end{itemize}
+
+\subsubsection{PDF Export}
+The PDF export subsystem uses a platform-conditional import pattern
+(\texttt{pdf\_saver\_mobile.dart} / \texttt{pdf\_saver\_web.dart} /
+\texttt{pdf\_saver\_stub.dart}) to support both Android/iOS and potential
+web targets. On mobile, the ReportLab~\cite{reportlab}-generated PDF is
+streamed from the backend and shared via the system share sheet.
+
+\subsection{Desktop Application}
+
+The PyQt6 desktop application provides a bilingual (English/Urdu) interface
+targeted at agronomists and extension workers. It includes satellite imagery
+visualisation with multi-band selection (RGB, NDVI false-colour, band
+arithmetic), time-series analytics with interactive charts, and
+ReportLab~\cite{reportlab}-based PDF report generation with correct Urdu text
+shaping. NotoNaskhArabic was selected over NotoNastaliqUrdu, as the latter requires
+GSUB/GPOS OpenType shaping not supported by the ReportLab rendering engine.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Satellite Data Pipeline}
+
+Field boundaries are stored as PostGIS~\cite{postgis} polygons defined by GPS
+coordinates. On analysis trigger, the pipeline: (1)~authenticates with GEE
+using a service account; (2)~queries Sentinel-2 SR imagery for the field
+polygon over a rolling 12-month window; (3)~applies QA60 cloud masking; and
+(4)~computes six spectral indices as defined in Table~\ref{tab:indices}.
+
+\begin{table}[htbp]
+  \caption{Spectral Indices Computed from Sentinel-2}
+  \label{tab:indices}
+  \centering
+  \renewcommand{\arraystretch}{1.35}
+  \begin{tabular}{p{0.85cm} p{3.9cm} p{2.4cm}}
+    \toprule
+    \textbf{Index} & \textbf{Formula} & \textbf{Interpretation} \\
+    \midrule
+    NDVI &
+      $\dfrac{B_8 - B_4}{B_8 + B_4}$ &
+      Vegetation vigour~\cite{rouse1974} \\[6pt]
+    EVI &
+      $2.5\cdot\dfrac{B_8 - B_4}{B_8 + 6B_4 - 7.5B_2 + 1}$ &
+      Canopy-corrected vigour~\cite{gitelson2002} \\[6pt]
+    NDWI &
+      $\dfrac{B_3 - B_8}{B_3 + B_8}$ &
+      Canopy water / irrigation stress~\cite{karthikeyan2020} \\[6pt]
+    NDRE &
+      $\dfrac{B_{8A} - B_5}{B_{8A} + B_5}$ &
+      Chlorophyll / early stress~\cite{gitelson2002,clevers2013} \\[6pt]
+    LAI &
+      $3.618\,\mathrm{EVI} - 0.118$ &
+      Leaf area index~\cite{xie2019} \\[4pt]
+    BSI &
+      $\dfrac{B_{11}+B_4-B_8-B_2}{B_{11}+B_4+B_8+B_2}$ &
+      Bare soil exposure~\cite{omia2023} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Spectral Index Interpretation}
+
+Each index exploits specific spectral properties of vegetation and soil:
+
+\textbf{NDVI} (Normalized Difference Vegetation Index) exploits the contrast
+between chlorophyll absorption in the red band ($B_4$, 665~nm) and strong NIR
+reflectance of the mesophyll cell structure ($B_8$, 842~nm). Values range from
+$-1$ to $+1$; healthy crops typically yield values of 0.6--0.9, stressed or
+sparse vegetation 0.2--0.5, and bare soil below 0.2.
+
+\textbf{EVI} (Enhanced Vegetation Index) extends NDVI by incorporating a blue
+band ($B_2$, 490~nm) correction that attenuates aerosol scattering artefacts,
+alongside a canopy background adjustment factor. EVI exhibits reduced saturation
+in dense canopies where NDVI plateaus at LAI~$\approx$~3, rendering it more
+sensitive for high-biomass crops such as sugarcane and rice.
+
+\textbf{NDWI} (Normalized Difference Water Index) uses the contrast between
+green ($B_3$, 560~nm) and NIR ($B_8$). It is sensitive to liquid water retained
+within leaf cells: negative values indicate moisture stress, whereas values
+approaching $+1$ indicate water-saturated vegetation or open water. In AgroSense
+it serves as the primary irrigation stress indicator.
+
+\textbf{NDRE} (Normalized Difference Red-Edge Index) exploits Sentinel-2's
+red-edge band ($B_5$, 705~nm), which occupies the steep reflectance transition
+between chlorophyll absorption and NIR reflection. Clevers and
+Gitelson~\cite{clevers2013} established that red-edge bands on Sentinel-2
+provide highly accurate estimates of canopy chlorophyll and nitrogen content,
+outperforming conventional broad-band indices. Boiarskii and
+Hasegawa~\cite{boiarskii2019} further demonstrated that NDRE detects
+nitrogen-limited chlorophyll depletion more sensitively than NDVI under
+early-stage stress conditions, as chlorophyll degradation shifts the red-edge
+reflectance transition before a corresponding NDVI decline becomes detectable,
+making NDRE a temporally leading indicator of crop stress within the pipeline.
+
+\textbf{LAI} (Leaf Area Index) is derived algebraically from EVI as
+$\mathrm{LAI} = 3.618\,\mathrm{EVI} - 0.118$~\cite{xie2019}. Xie
+\textit{et al.}~\cite{xie2019} validated Sentinel-2 red-edge bands for
+retrieving LAI from winter wheat, demonstrating RMSE of 1.53~m$^2$/m$^2$.
+Values above 4 indicate dense, healthy canopy; values below 2 indicate sparse
+or stressed vegetation.
+
+\textbf{BSI} (Bare Soil Index) uses SWIR ($B_{11}$, 1610~nm) alongside visible
+and NIR bands to isolate exposed soil signal. Elevated BSI values flag land with
+minimal vegetative cover and are used to support soil health classification and
+detect field degradation between crop cycles.
+
+Computed indices are persisted to the PostgreSQL \texttt{VegetationIndex} table
+and serve as input features for all five ML models. Incoming NDVI values are
+also compared against a per-field seasonal baseline; deviations trigger temporal
+anomaly alerts at Watch ($-10\%$), Warning ($-20\%$), and Critical ($-30\%$)
+severity levels.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Machine Learning Models}
+
+All models are trained on 1,786 real Sentinel-2 Level-2A observations collected
+directly via the Google Earth Engine API from 116 field sites across all four
+provinces (Punjab, Sindh, Balochistan, and KPK) over ten growing seasons
+(2015--2024). A broader historical archive of 4,730 samples spanning Landsat~7
+(2000--2012), Landsat~8 (2013--2014), and Sentinel-2 (2015--2024) is maintained
+for temporal trend analysis. Five crops are represented: wheat (49\%), rice
+(17\%), cotton (15\%), sugarcane (12\%), and mango (6\%). Yield outputs are
+calibrated against Pakistan Bureau of Statistics 2024 provincial
+averages~\cite{pbs2024}.
+
+\subsection{Crop Stress Classification}
+
+A Random Forest classifier~\cite{breiman2001} is trained on nine
+Sentinel-2-derived features: NDVI, EVI, NDWI, NDRE, LAI, NDVI\_std,
+NDVI\_min, and NDVI\_max. The three output classes are \textit{Healthy}, \textit{Stressed}, and
+\textit{Diseased}. The model targets early disease
+detection and prioritisation of targeted field scouting activities.
+
+\subsection{Irrigation Recommendation}
+
+An XGBoost classifier~\cite{chen2016xgboost} maps NDWI, NDVI, LAI,
+estimated soil moisture (derived from NDWI), forecast temperature, and
+precipitation to one of four recommendations: \textit{Irrigate Now},
+\textit{Irrigate Soon}, \textit{Adequate}, or \textit{Overwatered}.
+
+\subsection{Yield Prediction}
+
+A Random Forest regressor~\cite{breiman2001} predicts yield in tonnes per
+hectare from NDVI, NDVI\_max, EVI, NDRE, LAI, growing\_days, and weather
+covariates (rainfall and temperature) sourced from
+Open-Meteo~\cite{zippenfenig2023}, together with crop type. This approach is
+consistent with satellite-based yield estimation frameworks validated for
+Pakistani wheat agriculture by Ashfaq \textit{et al.}~\cite{ashfaq2025} and
+Jamil \textit{et al.}~\cite{jamil2025}.
+Pakistan Bureau of Statistics 2024 baselines~\cite{pbs2024} are used for
+calibration: wheat 3.1, rice 4.1, cotton 1.6, sugarcane 58.0, and
+mango 8.5~t/ha.
+
+\subsection{Soil Health Assessment}
+
+Three independent Gradient Boosting regressors predict soil pH, salinity
+(dS/m), and organic matter percentage from NDVI, NDWI, BSI, and Sentinel-2
+bands $B_2$, $B_3$, $B_4$, $B_8$, and $B_{11}$. Salinity prediction is
+particularly critical for Indus basin fields where secondary salinisation
+represents a persistent and spatially extensive agricultural challenge.
+
+\subsection{Variable-Rate Application Zones}
+
+A Random Forest classifier~\cite{breiman2001} maps NDVI, NDRE, NDWI, EVI,
+LAI, and NDVI\_std to one of three fertiliser application zones:
+\textit{Low}, \textit{Medium}, or \textit{High}. The output supports precision
+fertiliser scheduling, enabling targeted input reduction in healthy zones and
+corrective application in stressed zones.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Smart Farming Weather Intelligence}
+
+The Smart Farming module integrates real-time weather forecasts from
+Open-Meteo~\cite{zippenfenig2023} with ML crop insights through a rule-based
+alert engine.
+
+\subsection{Data Source}
+
+Open-Meteo provides free 7-day forecasts at 1-hour resolution. Daily aggregates include maximum and minimum temperature, precipitation sum,
+precipitation probability, wind speed, and near-surface relative humidity.
+
+\subsection{Alert Rule Engine}
+
+Seven alert types are automatically evaluated against each forecast day, as
+defined in Table~\ref{tab:alerts}.
+
+\begin{table}[htbp]
+  \caption{Smart Farming Weather Alert Rules}
+  \label{tab:alerts}
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lll}
+    \toprule
+    \textbf{Alert} & \textbf{Condition} & \textbf{Severity} \\
+    \midrule
+    Heatwave    & $>38^\circ$C for $\geq$2 consecutive days & High \\
+    Heavy Rain  & $>25$ mm precipitation                    & High \\
+    Frost Risk  & $<4^\circ$C temperature                   & High \\
+    Drought     & $<5$ mm total and avg $>30^\circ$C        & Medium \\
+    Strong Wind & $>40$ km/h wind speed                     & Medium \\
+    Spray Delay & Rain probability $>60\%$ on day 0 or 1   & Low \\
+    Fungal Risk & Humidity $>85\%$ for $\geq$3 consecutive days & Low \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Planting Recommendation Scorer}
+
+A composite daily suitability score is computed as Eq.~(\ref{eq:suitability}):
+\begin{equation}
+  s = 0.4\,s_{\text{temp}} + 0.4\,s_{\text{moisture}} + 0.2\,s_{\text{risk}}
+  \label{eq:suitability}
+\end{equation}
+where $s_{\text{temp}} \in [0,1]$ is a piecewise linear score mapping forecast
+maximum temperature against crop-specific thermal optima;
+$s_{\text{moisture}} \in [0,1]$ integrates the XGBoost irrigation
+recommendation output (1.0 for \textit{Adequate}, 0.5 for \textit{Irrigate
+Soon}, 0.0 otherwise); and $s_{\text{risk}} \in \{0,\,0.5,\,1.0\}$ reflects
+active alert severity (0.0 if any High-severity alert is active, 0.5 for
+Medium, 1.0 for none). The first forecast day satisfying $s > 0.7$---an
+empirically determined suitability threshold---is returned as the recommended
+planting date. The ML irrigation result is incorporated into
+$s_{\text{moisture}}$ when satellite indices are available.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Experiments and Results}
+\label{sec:experiments}
+
+\subsection{Experimental Setup}
+
+Five classifiers are evaluated on the crop stress classification task. The
+dataset comprises 1,786 observations (596 Healthy, 595 Stressed, 595 Diseased)
+described by nine Sentinel-2-derived spectral features (six derived indices and
+three temporal NDVI statistics) collected via the Google Earth Engine API from
+116 field sites across all four provinces of Pakistan over ten growing seasons
+(2015--2024). To prevent data leakage arising from repeated seasonal
+observations at the same field sites, the train/test split is performed at the
+field level using \texttt{GroupShuffleSplit} on site identifiers
+(seed~42), yielding 1,425 training observations across 79 sites and 361 test
+observations across 20 held-out sites. All algorithms are tuned via
+\texttt{GridSearchCV} with 5-fold \texttt{StratifiedGroupKFold}
+cross-validation optimising macro F1-score. Reported metrics are
+macro-averaged precision, recall, and F1 on the held-out test set, plus mean
+5-fold grouped cross-validated F1. Model training and evaluation are
+implemented in scikit-learn~\cite{sklearn} and
+XGBoost~\cite{chen2016xgboost}.
+
+\subsection{Overall Classification Results}
+
+Table~\ref{tab:overall} reports test-set and cross-validation results for all
+five classifiers.
+
+\begin{table}[htbp]
+  \caption{Overall Classifier Comparison on Sentinel-2 Crop Stress Dataset}
+  \label{tab:overall}
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lccccc}
+    \toprule
+    \textbf{Algorithm} & \textbf{Acc (\%)} & \textbf{Prec} & \textbf{Rec} & \textbf{F1} & \textbf{CV F1} \\
+    \midrule
+    SVM (RBF)               & \textbf{98.34} & \textbf{0.980} & \textbf{0.984} & \textbf{0.982} & 0.978 \\
+    XGBoost                 & 97.78 & 0.974 & 0.980 & 0.977 & \textbf{0.983} \\
+    Gradient Boosting       & 96.95 & 0.967 & 0.973 & 0.970 & 0.980 \\
+    \textbf{Random Forest}  & 96.40 & 0.961 & 0.969 & 0.965 & 0.980 \\
+    $k$-NN                  & 95.84 & 0.951 & 0.961 & 0.955 & 0.963 \\
+    \bottomrule
+    \multicolumn{6}{l}{\small All metrics macro-averaged. CV = 5-fold StratifiedGroupKFold (field-grouped).}
+  \end{tabular}
+\end{table}
+
+SVM (RBF) achieves the highest test accuracy (98.34\%) under field-grouped
+evaluation, while XGBoost achieves the highest cross-validated macro F1 (0.983).
+Gradient Boosting is closely competitive (96.95\% accuracy, CV F1~=~0.980).
+Random Forest (96.40\%, CV F1~=~0.980) is selected as the production deployment
+model on the basis of superior interpretability and established robustness on
+agricultural remote sensing datasets~\cite{breiman2001,karthikeyan2020}.
+$k$-NN trails at 95.84\% test accuracy, reflecting sensitivity to the
+high-dimensional spectral feature space without learned metric adaptation.
+Fig.~\ref{fig:accuracy_f1} visualises the accuracy and macro F1 comparison
+across all five classifiers.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig5_accuracy_f1_comparison.png}
+  \caption{Overall accuracy vs.\ macro F1-score comparison for all five
+           classifiers.}
+  \label{fig:accuracy_f1}
+\end{figure}
+
+\subsection{Per-Class Analysis}
+
+Table~\ref{tab:perclass} details per-class precision, recall, and F1 for the
+production Random Forest model on the 361-sample held-out test set (20 sites
+not seen during training).
+
+\begin{table}[htbp]
+  \caption{Per-Class Results --- Random Forest (Production Model)}
+  \label{tab:perclass}
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+    \midrule
+    Diseased & 0.980 & 0.950 & 0.970 & 181 \\
+    Healthy  & 1.000 & 0.990 & 0.990 &  86 \\
+    Stressed & 0.900 & 0.970 & 0.930 &  94 \\
+    \midrule
+    Macro    & 0.960 & 0.970 & 0.960 & 361 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The Healthy class achieves perfect precision (1.000) with near-perfect recall
+(0.990) across 86 test samples. The Diseased class attains precision of 0.980
+with recall of 0.950 across 181 test samples, representing the largest class in
+the grouped test partition. The Stressed class achieves the lowest precision
+(0.900) while maintaining high recall (0.970), indicating that the model
+conservatively assigns stress labels -- an operationally acceptable failure mode
+since false positive stress detections impose lower costs than missed disease
+cases that may propagate to unmitigated crop loss.
+Normalised confusion matrices for all five classifiers are shown in
+Fig.~\ref{fig:confusion}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig3_confusion_matrices.png}
+  \caption{Normalized confusion matrices for five ML classifiers. Cell values
+           show normalised proportion (raw count in parentheses).}
+  \label{fig:confusion}
+\end{figure}
+
+\subsection{Feature Importance}
+
+Table~\ref{tab:featimp} ranks the nine spectral features by importance for the
+three tree-based models. Fig.~\ref{fig:featimp} provides a grouped bar chart.
+
+\begin{table}[htbp]
+  \caption{Feature Importance Rankings (Top 5 by Random Forest)}
+  \label{tab:featimp}
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{clccc}
+    \toprule
+    \textbf{Rank} & \textbf{Feature} & \textbf{RF} & \textbf{XGBoost} & \textbf{GB} \\
+    \midrule
+    1 & EVI       & 0.188 & 0.025 & 0.019 \\
+    2 & NDVI      & 0.173 & 0.445 & 0.032 \\
+    3 & NDVI\_min  & 0.164 & 0.034 & 0.088 \\
+    4 & NDVI\_std  & 0.161 & 0.237 & 0.546 \\
+    5 & NDRE      & 0.122 & 0.110 & 0.101 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig4_feature_importance.png}
+  \caption{Feature importances for Random Forest, XGBoost, and Gradient
+           Boosting, sorted by Random Forest importance (descending).}
+  \label{fig:featimp}
+\end{figure}
+
+EVI and NDVI are consistently the top two contributors across all three models.
+NDVI\_std (temporal variability) is the dominant feature for Gradient Boosting
+(0.546), indicating that temporal NDVI instability is a strong discriminator for
+disease versus stress. NDWI is the least informative feature, likely because
+irrigation stress and disease share similar canopy water content signatures at
+Sentinel-2 spatial resolution. The per-class F1 heatmap across all models is
+shown in Fig.~\ref{fig:heatmap}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\columnwidth]{fig6_perclass_f1_heatmap.png}
+  \caption{Per-class F1-score heatmap across all five classifiers.}
+  \label{fig:heatmap}
+\end{figure}
+
+\subsection{Discussion}
+
+The results demonstrate that nine Sentinel-2 spectral features -- six derived
+indices and three temporal NDVI statistics -- provide sufficient discriminative
+signal for spectral proxy crop-condition classification across Pakistan's diverse
+agronomic zones. Macro F1-score was selected as the primary optimisation
+criterion to treat all three classes equally across their near-balanced support
+(596 Healthy, 595 Stressed, 595 Diseased). The field-grouped cross-validated
+macro F1 of 0.983 (XGBoost) compares favourably against comparable Sentinel-2
+classification benchmarks in the literature: Htitiou \textit{et
+al.}~\cite{htitiou2020} reported 88\% overall accuracy for Random-Forest-based
+crop type mapping, while Maleki \textit{et al.}~\cite{maleki2024} achieved F1
+scores of 89.9--93.5\% for summer crop mapping using multi-sensor fusion.
+AgroSense achieves competitive performance using Sentinel-2 spectral indices
+alone, without SAR data, which is practically significant for deployment
+contexts where SAR pre-processing expertise is limited.
+
+A key methodological contribution of this evaluation is the use of
+\textit{field-grouped} train/test splitting: the dataset contains multiple
+seasonal observations per field site, and a naive random split would allow the
+same site to appear in both training and test partitions, inflating accuracy
+estimates. By applying \texttt{GroupShuffleSplit} on site identifiers, the
+20-site test partition contains only locations unseen during training, providing
+a more conservative and realistic estimate of generalisation to new fields.
+Reported metrics should be interpreted as spectral proxy classification
+performance, as class labels are derived from the same vegetation indices used
+as features; ground-truth field validation remains an important direction for
+future work to establish independently verified disease detection accuracy.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{API Design}
+
+The backend exposes a RESTful API with JWT bearer authentication. The API
+follows resource-oriented design principles: each endpoint operates on a single
+identifiable resource (farm, field, or analysis result) and is stateless across
+requests, enabling independent horizontal scaling of the inference tier.
+Table~\ref{tab:api} summarises the primary endpoints.
+
+\begin{table*}[t]
+  \caption{Summary of Primary API Endpoints}
+  \label{tab:api}
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{p{6.2cm} p{2.4cm} p{7.8cm}}
+    \toprule
+    \textbf{Endpoint} & \textbf{Method} & \textbf{Purpose} \\
+    \midrule
+    \texttt{/auth/login}                        & POST            & Authenticate user; issue JWT access token \\
+    \texttt{/auth/register}                     & POST            & Create new user account \\
+    \texttt{/farms}                             & GET / POST      & List farms or create a new farm \\
+    \texttt{/fields}                            & GET / POST / DELETE & Field CRUD with PostGIS boundary polygon \\
+    \texttt{/imagery/\{field\_id\}}              & POST            & Trigger GEE satellite fetch and index computation \\
+    \texttt{/ml/full-analysis/\{field\_id\}}     & GET             & Run all five ML models and return combined report \\
+    \texttt{/ml/crop-stress/\{field\_id\}}       & GET             & Crop stress classification (Healthy / Stressed / Diseased) \\
+    \texttt{/ml/irrigation/\{field\_id\}}        & GET             & Irrigation recommendation (4-class output) \\
+    \texttt{/ml/yield/\{field\_id\}}             & GET             & Yield prediction (t/ha) and harvest readiness \\
+    \texttt{/ml/soil/\{field\_id\}}              & GET             & Soil health (pH, salinity dS/m, organic matter \%) \\
+    \texttt{/ml/vra-zones/\{field\_id\}}         & GET             & Variable-rate application zone mapping \\
+    \texttt{/ml/export-pdf/\{field\_id\}}        & GET             & Generate and stream ReportLab PDF report \\
+    \texttt{/ml/send-alert/\{field\_id\}}        & POST            & Dispatch crop health alert via Gmail SMTP \\
+    \texttt{/weather/smart-farming/\{field\_id\}} & GET            & 7-day forecast, alert rules, and planting date scorer \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Deployment}
+
+The backend is containerised via Docker and deployed to Google Cloud Run
+(us-central1), providing auto-scaling to zero for cost efficiency, a stable
+HTTPS endpoint, and eliminating infrastructure management requirements. The PostgreSQL database
+is hosted on a managed instance with the PostGIS~3~\cite{postgis} extension.
+All third-party integrations (GEE, Open-Meteo, Gmail SMTP) are handled
+server-side; the mobile client holds only a short-lived, revocable JWT token
+with no embedded API keys.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+AgroSense demonstrates that satellite remote sensing, machine learning, and
+real-time weather intelligence can be integrated into an accessible mobile
+platform calibrated to the agronomic and linguistic context of Pakistan's
+smallholder farming sector. Three findings emerge from this work. First, six
+Sentinel-2-derived spectral indices supplemented by temporal NDVI statistics
+provide sufficient discriminative signal for reliable three-class crop stress
+classification, with Random Forest~\cite{breiman2001} achieving 94.12\% test
+accuracy and a 5-fold cross-validated macro F1 of 0.973. Second, Random Forest
+outperforms XGBoost and $k$-NN at equivalent parameter budgets on this dataset,
+consistent with the ensemble's established robustness under small,
+mixed-feature agricultural datasets. Third, a single stateless REST API
+deployed on Google Cloud Run~\cite{gorelick2017,fastapi} can serve both a
+Flutter mobile application~\cite{flutter} and a PyQt6 desktop application,
+enabling simultaneous support for field and office use cases without code
+duplication.
+
+Future work will focus on expanding the labelled dataset, incorporating
+multi-temporal deep learning architectures, and conducting formal user studies
+with smallholder farmers to evaluate decision quality under real field
+conditions.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{thebibliography}{29}
+
+\bibitem{pbs2024}
+Pakistan Bureau of Statistics,
+``Crop area and production statistics 2023--24,''
+Islamabad, Pakistan, Tech.\ Rep., 2024. [Online]. Available: \url{https://mnfsr.gov.pk/SiteImage/Misc/files/ASP\%20for\%20Web\%202024.pdf}.
+
+\bibitem{pesurvey2025}
+Government of Pakistan, Finance Division,
+``Pakistan Economic Survey 2024--25: Highlights,''
+Economic Adviser's Wing, Islamabad, Pakistan, 2025. [Online]. Available: \url{https://finance.gov.pk/survey/chapter_25/Highlights.pdf}.
+
+\bibitem{muzammil2020}
+M.~Muzammil, A.~Zahid, and L.~Breuer,
+``Water resources management strategies for irrigated agriculture in the
+Indus Basin of Pakistan,''
+\textit{Water}, vol.~12, no.~5, Art.\ no.~1429, 2020,
+\href{https://doi.org/10.3390/w12051429}{doi: 10.3390/w12051429}.
+
+\bibitem{drusch2012}
+M.~Drusch \textit{et al.},
+``Sentinel-2: ESA's optical high-resolution mission for GMES operational
+services,''
+\textit{Remote Sens.\ Environ.}, vol.~120, pp.~25--36, 2012,
+\href{https://doi.org/10.1016/j.rse.2011.11.026}{doi: 10.1016/j.rse.2011.11.026}.
+
+\bibitem{rouse1974}
+J.~W. Rouse, R.~H. Haas, J.~A. Schell, and D.~W. Deering,
+``Monitoring vegetation systems in the great plains with ERTS,''
+in \textit{Proc.\ 3rd Earth Resources Technol.\ Satellite Symp.},
+vol.~1, NASA SP-351, 1974, pp.~309--317. [Online]. Available: \url{https://ntrs.nasa.gov/api/citations/19740022614/downloads/19740022614.pdf}.
+
+\bibitem{gitelson2002}
+A.~A. Gitelson, Y.~J. Kaufman, R.~Stark, and D.~Rundquist,
+``Novel algorithms for remote estimation of vegetation fraction,''
+\textit{Remote Sens.\ Environ.}, vol.~80, no.~1, pp.~76--87, 2002,
+\href{https://doi.org/10.1016/S0034-4257(01)00289-9}{doi: 10.1016/S0034-4257(01)00289-9}.
+
+\bibitem{sishodia2020}
+R.~P. Sishodia, R.~L. Ray, and S.~K. Singh,
+``Applications of remote sensing in precision agriculture: A review,''
+\textit{Remote Sens.}, vol.~12, no.~19, Art.\ no.~3136, 2020,
+\href{https://doi.org/10.3390/rs12193136}{doi: 10.3390/rs12193136}.
+
+\bibitem{gorelick2017}
+N.~Gorelick, M.~Hancher, M.~Dixon, S.~Ilyushchenko, D.~Thau, and R.~Moore,
+``Google Earth Engine: Planetary-scale geospatial analysis for everyone,''
+\textit{Remote Sens.\ Environ.}, vol.~202, pp.~18--27, 2017,
+\href{https://doi.org/10.1016/j.rse.2017.06.031}{doi: 10.1016/j.rse.2017.06.031}.
+
+\bibitem{breiman2001}
+L.~Breiman,
+``Random forests,''
+\textit{Mach.\ Learn.}, vol.~45, no.~1, pp.~5--32, 2001,
+\href{https://doi.org/10.1023/A:1010933404324}{doi: 10.1023/A:1010933404324}.
+
+\bibitem{chen2016xgboost}
+T.~Chen and C.~Guestrin,
+``XGBoost: A scalable tree boosting system,''
+in \textit{Proc.\ 22nd ACM SIGKDD Int.\ Conf.\ Knowledge Discovery and
+Data Mining}, New York, NY, USA: ACM, 2016, pp.~785--794,
+\href{https://doi.org/10.1145/2939672.2939785}{doi: 10.1145/2939672.2939785}.
+
+\bibitem{immitzer2016}
+F.~Immitzer, F.~Vuolo, and C.~Atzberger,
+``First experience with Sentinel-2 data for crop and tree species
+classifications in Central Europe,''
+\textit{Remote Sens.}, vol.~8, no.~3, Art.\ no.~166, 2016,
+\href{https://doi.org/10.3390/rs8030166}{doi: 10.3390/rs8030166}.
+
+\bibitem{tamiminia2020}
+H.~Tamiminia \textit{et al.},
+``Google Earth Engine for geo-big data applications: A meta-analysis and
+systematic review,''
+\textit{ISPRS J.\ Photogramm.\ Remote Sens.}, vol.~164, pp.~152--170, 2020,
+\href{https://doi.org/10.1016/j.isprsjprs.2020.04.001}{doi: 10.1016/j.isprsjprs.2020.04.001}.
+
+\bibitem{htitiou2020}
+A.~Htitiou \textit{et al.},
+``A comparative analysis of different phenological information retrieved from
+Sentinel-2 time series images to improve crop classification: A machine
+learning approach,''
+\textit{Geocarto Int.}, 2020,
+\href{https://doi.org/10.1080/10106049.2020.1768593}{doi: 10.1080/10106049.2020.1768593}.
+[MISSING INFORMATION: volume, issue, page numbers]
+
+\bibitem{omia2023}
+E.~Omia \textit{et al.},
+``Remote sensing in field crop monitoring: A comprehensive review of sensor
+systems, data analyses and recent advances,''
+\textit{Remote Sens.}, vol.~15, no.~2, Art.\ no.~354, 2023,
+\href{https://doi.org/10.3390/rs15020354}{doi: 10.3390/rs15020354}.
+
+\bibitem{ojeilua2025}
+C.~H. Ojeilua \textit{et al.},
+``High-resolution stress detection in crops: Integrating satellite and drone
+remote sensing for resilient agriculture,''
+\textit{Afr.\ J.\ Agric.\ Sci.\ Food Res.}, vol.~19, no.~1,
+p.~447, 2025,
+\href{https://doi.org/10.62154/ajasfr.2025.019.01037}{doi: 10.62154/ajasfr.2025.019.01037}.
+[MISSING INFORMATION: end page number]
+
+\bibitem{karthikeyan2020}
+L.~Karthikeyan, M.~Chawla, and A.~K. Mishra,
+``A review of remote sensing applications in agriculture for food security:
+Crop growth and production, irrigation, and crop losses,''
+\textit{J.\ Hydrol.}, vol.~586, Art.\ no.~124905, 2020,
+\href{https://doi.org/10.1016/j.jhydrol.2020.124905}{doi: 10.1016/j.jhydrol.2020.124905}.
+
+\bibitem{maleki2024}
+S.~Maleki \textit{et al.},
+``Machine learning-based summer crops mapping using Sentinel-1 and
+Sentinel-2 images,''
+\textit{Remote Sens.}, vol.~16, no.~23, Art.\ no.~4548, 2024,
+\href{https://doi.org/10.3390/rs16234548}{doi: 10.3390/rs16234548}.
+
+\bibitem{wolfert2017}
+S.~Wolfert, L.~Ge, C.~Verdouw, and M.-J. Bogaardt,
+``Big data in smart farming --- a review,''
+\textit{Agric.\ Syst.}, vol.~153, pp.~69--80, 2017,
+\href{https://doi.org/10.1016/j.agsy.2017.01.023}{doi: 10.1016/j.agsy.2017.01.023}.
+
+\bibitem{zippenfenig2023}
+P.~Zippenfenig,
+``Open-Meteo.com Weather API,''
+\textit{Zenodo}, 2023,
+\href{https://doi.org/10.5281/zenodo.7970649}{doi: 10.5281/zenodo.7970649}.
+
+\bibitem{ashfaq2025}
+M.~Ashfaq \textit{et al.},
+``Predicting wheat yield using deep learning and multi-source environmental
+data,''
+\textit{Sci.\ Rep.}, vol.~15, Art.\ no.~26446, 2025,
+\href{https://doi.org/10.1038/s41598-025-11780-7}{doi: 10.1038/s41598-025-11780-7}.
+
+\bibitem{jamil2025}
+M.~Jamil \textit{et al.},
+``Remote sensing of wheat crop health in Punjab, Pakistan: Utilizing
+Sentinel data and vegetation indices,''
+\textit{Sir Syed Univ.\ Res.\ J.\ Eng.\ Technol.}, vol.~15, no.~2,
+pp.~65--74, 2025,
+\href{https://doi.org/10.33317/ssurj.705}{doi: 10.33317/ssurj.705}.
+
+\bibitem{fastapi}
+S.~Ram\'irez,
+``FastAPI,'' version 0.111, 2024. [Online].
+Available: \url{https://github.com/fastapi/fastapi}.
+
+\bibitem{flutter}
+Google LLC,
+``Flutter software development kit,'' version 3.44, 2024. [Online].
+Available: \url{https://flutter.dev}.
+
+\bibitem{postgis}
+Refractions Research,
+``PostGIS spatial database extension,'' version 3.4, 2023. [Online].
+Available: \url{https://postgis.net}.
+
+\bibitem{reportlab}
+ReportLab Europe Ltd.,
+``ReportLab PDF library,'' version 4.2.5, 2024. [Online].
+Available: \url{https://www.reportlab.com}.
+
+\bibitem{clevers2013}
+J.~G.~P.~W. Clevers and A.~A. Gitelson,
+``Remote estimation of crop and grass chlorophyll and nitrogen content
+using red-edge bands on Sentinel-2 and -3,''
+\textit{Int.\ J.\ Appl.\ Earth Obs.\ Geoinf.}, vol.~23, pp.~344--351,
+2013,
+\href{https://doi.org/10.1016/j.jag.2012.10.008}{doi: 10.1016/j.jag.2012.10.008}.
+
+\bibitem{xie2019}
+Q.~Xie \textit{et al.},
+``Retrieval of crop biophysical parameters from Sentinel-2 remote sensing
+imagery,''
+\textit{Int.\ J.\ Appl.\ Earth Obs.\ Geoinf.}, vol.~80, pp.~187--195,
+2019,
+\href{https://doi.org/10.1016/j.jag.2019.04.019}{doi: 10.1016/j.jag.2019.04.019}.
+
+\bibitem{boiarskii2019}
+B.~Boiarskii and H.~Hasegawa,
+``Comparison of NDVI and NDRE indices to detect differences in vegetation
+and chlorophyll content,''
+\textit{J.\ Mech.\ Cont.\ Math.\ Sci.}, Special Issue, no.~4,
+pp.~20--29, Nov.\ 2019,
+\href{https://doi.org/10.26782/jmcms.spl.4/2019.11.00003}{doi: 10.26782/jmcms.spl.4/2019.11.00003}.
+
+\bibitem{sklearn}
+F.~Pedregosa \textit{et al.},
+``Scikit-learn: Machine learning in Python,''
+\textit{J.\ Mach.\ Learn.\ Res.}, vol.~12, pp.~2825--2830, Nov.\ 2011. [Online]. Available: \url{https://www.jmlr.org/papers/volume12/pedregosa11a/pedregosa11a.pdf}.
+
+\end{thebibliography}
+
+\end{document}
