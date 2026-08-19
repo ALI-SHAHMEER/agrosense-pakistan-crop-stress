@@ -1,6 +1,6 @@
-Algorithm,Accuracy_pct,Precision_Macro,Recall_Macro,F1_Macro,CV_F1_Macro,Notes
-Random Forest,98.88,0.989,0.989,0.989,0.985,Production model
-XGBoost,98.32,0.983,0.983,0.983,0.982,
-Gradient Boosting,98.60,0.986,0.986,0.986,0.984,
-SVM (RBF),98.60,0.986,0.986,0.986,0.985,
-k-NN,95.81,0.958,0.958,0.958,0.956,
+Algorithm,Accuracy_pct,Precision_Macro,Recall_Macro,F1_Macro,CV_F1_Macro
+Random Forest,96.4,0.961,0.969,0.965,0.98
+XGBoost,97.78,0.974,0.98,0.977,0.983
+Gradient Boosting,96.95,0.967,0.973,0.97,0.98
+SVM (RBF),98.34,0.98,0.984,0.982,0.978
+k-NN,95.84,0.951,0.961,0.955,0.963

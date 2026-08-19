@@ -1,22 +1,22 @@
 Column,Type,Unit,Description
-location_id,string,,Unique site code (e.g. PB01 = Punjab site 1)
-location_name,string,,City or district name of the field site
+location_id,string,,Unique site code (e.g. PB01 = Punjab site 1; SD=Sindh; BL=Balochistan; KP=KPK)
+location_name,string,,City or district name of the field site (publicly known district centroids)
 province,string,,Pakistani province: Punjab / Sindh / Balochistan / KPK
-season,string,,Growing season identifier (e.g. Kharif_2015)
+season,string,,Growing season identifier (e.g. Kharif_2015 or Rabi_2016)
 season_type,string,,Season category: kharif (May–Nov) or rabi (Nov–Apr)
 crop_type,string,,Primary crop grown: wheat / rice / cotton / sugarcane / mango
-lat,float,decimal degrees,Latitude of field site centroid
-lon,float,decimal degrees,Longitude of field site centroid
-ndvi,float,dimensionless [-1 to 1],Normalized Difference Vegetation Index — primary crop health indicator
-evi,float,dimensionless [-1 to 1],Enhanced Vegetation Index — reduces atmosphere and soil noise vs NDVI
-ndwi,float,dimensionless [-1 to 1],Normalized Difference Water Index — canopy water content
-ndre,float,dimensionless [-1 to 1],Normalized Difference Red Edge — sensitive to chlorophyll content
-lai,float,m² m⁻²,Leaf Area Index — estimated canopy density
-bsi,float,dimensionless,Bare Soil Index — soil exposure fraction
-ndvi_std,float,dimensionless,Standard deviation of NDVI across n_images composited — temporal variability
-ndvi_min,float,dimensionless,Minimum seasonal NDVI
-ndvi_max,float,dimensionless,Maximum seasonal NDVI
-temp_celsius,float,°C,Mean seasonal air temperature (season-type imputed from Open-Meteo climatology)
-rainfall_mm,float,mm,Total seasonal rainfall (season-type imputed from CHIRPS climatology)
-soil_moisture,float,%,Estimated soil moisture (linearly scaled from NDWI; range 16–28%)
-crop_stress_label,string,,Target class: Healthy / Stressed / Diseased (derived from tertile split on vegetation health composite 0.5·NDVI + 0.3·NDRE + 0.2·EVI)
+lat,float,decimal degrees,Latitude of district centroid (publicly available administrative data)
+lon,float,decimal degrees,Longitude of district centroid (publicly available administrative data)
+ndvi,float,dimensionless [-1 to 1],Normalized Difference Vegetation Index — (B8-B4)/(B8+B4)
+evi,float,dimensionless [-1 to 1],Enhanced Vegetation Index — 2.5*(B8-B4)/(B8+6*B4-7.5*B2+1)
+ndwi,float,dimensionless [-1 to 1],Normalized Difference Water Index — (B3-B8)/(B3+B8)
+ndre,float,dimensionless [-1 to 1],Normalized Difference Red Edge — computed as (B8A-B5)/(B8A+B5) in GEE where B5 (705nm) and B8A (865nm) are native S2 bands. NOTE: The local compute_indices() function previously contained a bug using B4 instead of B5; this has been corrected in feature_engineering.py v1.0.0.
+lai,float,m² m⁻²,Leaf Area Index — estimated from EVI via LAI = 3.618*EVI - 0.118
+bsi,float,dimensionless,Bare Soil Index — ((B11+B4)-(B8+B2))/((B11+B4)+(B8+B2))
+ndvi_std,float,dimensionless,Standard deviation of NDVI across all cloud-free images in the season composite — measures temporal crop variability
+ndvi_min,float,dimensionless,Minimum seasonal NDVI across composite images
+ndvi_max,float,dimensionless,Maximum seasonal NDVI across composite images
+temp_celsius,float,°C,Mean seasonal air temperature (season-type imputed from Open-Meteo Pakistani climatology: rabi=19°C ± noise; kharif=30°C ± noise)
+rainfall_mm,float,mm,Total seasonal rainfall (season-type imputed from CHIRPS climatology: rabi=120mm ± noise; kharif=280mm ± noise)
+soil_moisture,float,%,Estimated volumetric soil moisture (linearly scaled from NDWI; range 16–28%)
+crop_stress_label,string,,"Target class: Healthy / Stressed / Diseased. IMPORTANT — label circularity: labels are derived deterministically from the vegetation health composite 0.5·NDVI + 0.3·NDRE + 0.2·EVI via tertile split. Since NDVI, NDRE, and EVI are also model input features, classifiers partly learn the rule that generated their own labels. Reported accuracy is an upper bound for spectral separability under these proxy labels, not independently validated disease detection accuracy."
